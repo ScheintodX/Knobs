@@ -1,0 +1,16 @@
+{
+	"name": "Knobs",
+	"description": "Easy to use simplified buttons and switches",
+	"keywords": "button, switch, panel, push, click, release, hold",
+	"authors": {
+		"name": "Florian Bantner",
+		"url": "https://www.github.com/ScheintodX"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ScheintodX/Knobs.git"
+	},
+	"version": "0.0.1",
+	"platforms": "atmelavr, espressif, titiva",
+	"frameworks": "arduino, energia"
+}
