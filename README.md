@@ -50,4 +50,27 @@ EXAMPLE:
 
 ISSUES:
  * Not ready yet
- * Make even more simple to use
+ * Make even more simple to use:
+   * Simplify (somehow?) declaration. Much better would be a style like:
+
+    Knob knob( D1 )
+		.on( Click( onClick ) )
+		.on( Hold( onHold, 500 ) )
+		;
+
+	(Doesn't work because we can't execute code at that place)
+
+	or at least:
+
+	Knob knob( D1 );
+
+	setup {
+
+		knob
+			.on( Click( onClick ) )
+			.on( Hold( onHold, 500 ) )
+			;
+
+		(Doesn't work because we can't allocate Handlers on Stack.)
+	}
+
