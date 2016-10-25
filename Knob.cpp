@@ -1,10 +1,12 @@
 #include "Knob.h"
 
-#include <Energia.h>
-#include <cstdarg>
+#include <Arduino.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic warning "-Wpedantic"
+#pragma GCC diagnostic error "-Wreturn-type"
 
 using namespace Knobs;
-
 
 // == Device ==
 
@@ -135,17 +137,30 @@ Knob& Knob::debounce( time_t time ) {
  * H A N D L E R
  */
 
-Handler::Handler( callback_t callback ) : _cb( callback ) {}
+Handler::Handler( HandlerType type, callback_t callback ) 
+		: _cb( callback ), _cbm( NULL ), type( type ) {}
+Handler::Handler( HandlerType type, minimal_callback_t callback )
+		: _cb( NULL ), _cbm( callback ), type( type ) {}
+
+bool Handler::_callback( Device &dev, value_t newState, value_t oldState, time_t count ) {
+
+	if( _cbm ) {
+		_cbm();
+		return true;
+	//} else if( _cbs ) return _cbs( newState, oldState, count );
+	} else return _cb( dev, *this, newState, oldState, count );
+}
 
 
 // == Push ==
 
-Push::Push( callback_t callback ) : Handler( callback ) {}
+Push::Push( callback_t callback ) : Handler( PUSH, callback ) {}
+Push::Push( minimal_callback_t callback ) : Handler( PUSH, callback ) {}
 
 bool Push::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
 
 	if( newState && !oldState )
-			return _cb( dev, newState, oldState, time );
+			return _callback( dev, newState, oldState, time );
 
 	return true;
 }
@@ -153,12 +168,27 @@ bool Push::handle( Device &dev, value_t newState, value_t oldState, time_t time 
 
 // == Release ==
 
-Release::Release( callback_t callback ) : Handler( callback ) {}
+Release::Release( callback_t callback ) : Handler( RELEASE, callback ) {}
+Release::Release( minimal_callback_t callback ) : Handler( RELEASE, callback ) {}
 
 bool Release::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
 
 	if( !newState && oldState )
-			return _cb( dev, newState, oldState, time );
+			return _callback( dev, newState, oldState, time );
+
+	return true;
+}
+
+
+// == Toggle ==
+
+Toggle::Toggle( callback_t callback ) : Handler( TOGGLE, callback ) {}
+Toggle::Toggle( minimal_callback_t callback ) : Handler( TOGGLE, callback ) {}
+
+bool Toggle::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+
+	if( newState != oldState )
+			return _callback( dev, newState, oldState, time );
 
 	return true;
 }
@@ -166,8 +196,32 @@ bool Release::handle( Device &dev, value_t newState, value_t oldState, time_t ti
 
 // == Click ==
 
+Click::Click( HandlerType type, callback_t callback, time_t maxTime )
+		: Handler( type, callback )
+		, _maxTimeClick( maxTime )
+		{}
+Click::Click( HandlerType type, minimal_callback_t callback, time_t maxTime )
+		: Handler( type, callback )
+		, _maxTimeClick( maxTime )
+		{}
+
+Click::Click( callback_t callback )
+		: Handler( CLICK, callback )
+		, _maxTimeClick( MAX_TIME_CLICK )
+		{}
+
 Click::Click( callback_t callback, time_t maxTime )
-		: Handler( callback )
+		: Handler( CLICK, callback )
+		, _maxTimeClick( maxTime )
+		{}
+
+Click::Click( minimal_callback_t callback )
+		: Handler( CLICK, callback )
+		, _maxTimeClick( MAX_TIME_CLICK )
+		{}
+
+Click::Click( minimal_callback_t callback, time_t maxTime )
+		: Handler( CLICK, callback )
 		, _maxTimeClick( maxTime )
 		{}
 
@@ -186,20 +240,125 @@ bool Click::handle( Device &dev, value_t newState, value_t oldState, time_t time
 		} else {
 
 			if( now-_timeStart < _maxTimeClick )
-					return _cb( dev, newState, oldState, time );
+					return _callback( dev, newState, oldState, time );
 
 		}
-
 	}
 
 	return true;
+}
+
+// == DoubleClick ==
+
+DoubleClick::DoubleClick( callback_t callback )
+		: Click( DOUBLECLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		, _maxClicks( 2 )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+DoubleClick::DoubleClick( callback_t callback, value_t maxClicks )
+		: Click( DOUBLECLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		, _maxClicks( 2 )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+DoubleClick::DoubleClick( callback_t callback, value_t maxClicks, time_t maxTimeClick, time_t maxTimeInbetween )
+		: Click( DOUBLECLICK, callback, maxTimeClick )
+		, _maxTimeInbetween( maxTimeInbetween )
+		, _maxClicks( maxClicks )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+DoubleClick::DoubleClick( minimal_callback_t callback )
+		: Click( DOUBLECLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		, _maxClicks( 2 )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks )
+		: Click( DOUBLECLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		, _maxClicks( 2 )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks, time_t maxTimeClick, time_t maxTimeInbetween )
+		: Click( DOUBLECLICK, callback, maxTimeClick )
+		, _maxTimeInbetween( maxTimeInbetween )
+		, _maxClicks( maxClicks )
+		{
+	
+	_clicks = 0;
+	_timeStartSequence = 0;
+}
+
+
+bool DoubleClick::_callback( Device &dev, value_t newValue, value_t oldValue, time_t count ) {
+
+	time_t now = millis(),
+	       delta = now-_timeStartSequence
+		   ;
+
+	if( _clicks == 0 ) {
+
+		_timeStartSequence = now;
+		_clicks = 1;
+
+	} else {
+
+		if( delta < _maxTimeInbetween ) {
+			_clicks ++;
+		} else {
+			_clicks = 0;
+		}
+
+		if( _clicks == _maxClicks ) {
+
+			_clicks = 0;
+
+			return Click::_callback( dev, newValue, oldValue, delta );
+		}
+	}
+
+	return true;
+}
+
+bool DoubleClick::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+
+	return Click::handle( dev, newState, oldState, time );
 
 }
 
 // == Hold ==
 
 Hold::Hold( callback_t callback, time_t time ) 
-		: Handler( callback ) 
+		: Handler( HOLD, callback ) 
+		, _timeHold( time )
+		{
+		
+	_continues = false;
+	_hasSent = false;
+}
+Hold::Hold( minimal_callback_t callback, time_t time ) 
+		: Handler( HOLD, callback ) 
 		, _timeHold( time )
 		{
 		
@@ -213,7 +372,7 @@ bool Hold::handle( Device &dev, value_t newState, value_t oldState, time_t time 
 
 		_hasSent = true;
 
-		return _cb( dev, newState, oldState, time );
+		return _callback( dev, newState, oldState, time );
 	} 
 	if( !newState ) {
 
@@ -257,3 +416,5 @@ void Panel::loop() {
 		dev->loop();
 	}
 }
+
+#pragma GCC diagnostic pop
