@@ -24,7 +24,7 @@ namespace Knobs {
 		private:
 			const pin_t _pin;
 			bool _active;
-			bool _saved;
+			bool _stored;
 
 			bool _invert;
 
@@ -44,7 +44,7 @@ namespace Knobs {
 			Valve& off();
 			bool toggle();
 
-			Valve& save();
+			Valve& store();
 			Valve& restore();
 	};
 
@@ -65,7 +65,7 @@ namespace Knobs {
 			Transducer& off();
 			Transducer& toggle();
 
-			Transducer &save();
+			Transducer &store();
 			Transducer &restore();
 	};
 

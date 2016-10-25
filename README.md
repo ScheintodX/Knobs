@@ -74,5 +74,4 @@ ISSUES:
 		(Doesn't work because we can't allocate Handlers on Stack.)
 	}
 
- * Include minimal_callback_t
  * Make doubleclick work in combination with click somehow?

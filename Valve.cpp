@@ -13,7 +13,7 @@ Valve::Valve( pin_t pin )
 
 	_active = false;
 	_invert = false;
-	_saved = false;
+	_stored = false;
 
 	pinMode( pin, OUTPUT );
 }
@@ -56,12 +56,12 @@ bool Valve::toggle() {
 }
 
 
-Valve& Valve::save() {
-	_saved = _active;
+Valve& Valve::store() {
+	_stored = _active;
 	return *this;
 }
 Valve& Valve::restore() {
-	_active = _saved;
+	_active = _stored;
 	return _turn( _active );
 }
 
@@ -110,8 +110,8 @@ Transducer& Transducer::toggle() {
 	TONALL( toggle );
 	return *this;
 }
-Transducer& Transducer::save() {
-	TONALL( save );
+Transducer& Transducer::store() {
+	TONALL( store );
 	return *this;
 }
 Transducer& Transducer::restore() {
