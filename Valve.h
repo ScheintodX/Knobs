@@ -57,6 +57,20 @@ namespace Knobs {
 			inline Transducer& _turn( bool on );
 
 		public:
+
+			Transducer();
+			Transducer( Valve &v1 );
+			Transducer( Valve &v1, Valve &v2 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+					Valve &v6 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+					Valve &v6, Valve &v7 );
+			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+					Valve &v6, Valve &v7, Valve &v8 );
+
 			Transducer& operator<<( Valve &valve );
 
 			Transducer& active( bool on );

@@ -397,6 +397,34 @@ Hold& Hold::continues( bool on ) {
 
 Panel::Panel(){}
 
+Panel::Panel( Device &k1 ) {
+	*this << k1;
+}
+Panel::Panel( Device &k1, Device &k2 ) {
+	*this << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3 ) {
+	*this << k3 << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4 ) {
+	*this << k4 << k3 << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5 ) {
+	*this << k5 << k4 << k3 << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+		Device &k6 ) {
+	*this << k6 << k5 << k4 << k3 << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+		Device &k6, Device &k7 ) {
+	*this << k7 << k6 << k5 << k4 << k3 << k2 << k1;
+}
+Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+		Device &k6, Device &k7, Device &k8 ) {
+	*this << k8 << k7 << k6 << k5 << k4 << k3 << k2 << k1;
+}
+
 Panel& Panel::operator <<( Device &dev ) {
 
 	dev._next = _first;

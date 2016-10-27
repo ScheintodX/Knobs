@@ -109,7 +109,6 @@ namespace Knobs {
 			Click( minimal_callback_t callback );
 			Click( minimal_callback_t callback, time_t maxTime );
 
-
 			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
 	};
 
@@ -246,6 +245,19 @@ namespace Knobs {
 		public:
 
 			Panel();
+
+			Panel( Device &k1 );
+			Panel( Device &k1, Device &k2 );
+			Panel( Device &k1, Device &k2, Device &k3 );
+			//Panel( Device &k1, Device &k2, Device &k3, Device... rest );
+			Panel( Device &k1, Device &k2, Device &k3, Device &k4 );
+			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5 );
+			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+					Device &k6 );
+			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+					Device &k6, Device &k7 );
+			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
+					Device &k6, Device &k7, Device &k8 );
 
 			Panel& operator <<( Device &device );
 

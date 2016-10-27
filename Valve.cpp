@@ -71,6 +71,35 @@ Valve& Valve::restore() {
  * T R A N S D U C E R
  */
 
+Transducer::Transducer(){}
+Transducer::Transducer( Valve &v1 ){
+	*this << v1;
+}
+Transducer::Transducer( Valve &v1, Valve &v2 ){
+	*this << v1 << v2;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3 ){
+	*this << v1 << v2 << v3;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4 ){
+	*this << v1 << v2 << v3 << v4;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5 ){
+	*this << v1 << v2 << v3 << v4 << v5;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+		Valve &v6 ){
+	*this << v1 << v2 << v3 << v4 << v5 << v6;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+		Valve &v6, Valve &v7 ){
+	*this << v1 << v2 << v3 << v4 << v5 << v6 << v7;
+}
+Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+		Valve &v6, Valve &v7, Valve &v8 ){
+	*this << v1 << v2 << v3 << v4 << v5 << v6 << v7 << v8;
+}
+
 Transducer& Transducer::operator <<( Valve &valve ) {
 
 	valve._next = _first;
