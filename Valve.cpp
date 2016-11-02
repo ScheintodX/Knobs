@@ -23,25 +23,21 @@ Valve& Valve::invert() {
 	return *this;
 }
 
-inline Valve& Valve::_turn( bool on ) {
+Valve& Valve::turn( bool on ) {
 	_active = on;
 	digitalWrite( _pin, _active ^ _invert );
 	return *this;
 }
 
 Valve& Valve::active( bool on ) {
-	return _turn( on );
-}
-
-Valve& Valve::turn( bool on ) {
-	return _turn( on );
+	return turn( on );
 }
 
 Valve& Valve::on() {
-	return _turn( true );
+	return turn( true );
 }
 Valve& Valve::off() {
-	return _turn( false );
+	return turn( false );
 }
 
 bool Valve::active() {
@@ -51,7 +47,7 @@ bool Valve::active() {
 
 bool Valve::toggle() {
 
-	_turn( !_active );
+	turn( !_active );
 	return _active;
 }
 
@@ -62,9 +58,23 @@ Valve& Valve::store() {
 }
 Valve& Valve::restore() {
 	_active = _stored;
-	return _turn( _active );
+	return turn( _active );
 }
 
+/*
+ * D O U B L E  V A L V E
+ */
+
+DoubleValve::DoubleValve( pin_t pin, Valve &other )
+		: Valve( pin )
+		, _other( other )
+		{}
+
+Valve& DoubleValve::turn( bool on ) {
+
+	_other.turn( on );
+	return Valve::turn( on );
+}
 
 
 /*
@@ -118,22 +128,19 @@ Transducer& Transducer::operator <<( Valve &valve ) {
 					val->m( p ); \
 			}
 
-inline Transducer& Transducer::_turn( bool on ) {
+inline Transducer& Transducer::turn( bool on ) {
 
 	TONALLP( turn, on );
 	return *this;
 }
-Transducer& Transducer::turn( bool on ) {
-	return _turn( on );
-}
 Transducer& Transducer::active( bool on ) {
-	return _turn( on );
+	return turn( on );
 }
 Transducer& Transducer::on() {
-	return _turn( ON );
+	return turn( ON );
 }
 Transducer& Transducer::off() {
-	return _turn( OFF );
+	return turn( OFF );
 }
 Transducer& Transducer::toggle() {
 	TONALL( toggle );
@@ -147,4 +154,5 @@ Transducer& Transducer::restore() {
 	TONALL( restore );
 	return *this;
 }
+
 #pragma GCC diagnostic pop

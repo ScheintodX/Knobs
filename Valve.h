@@ -28,8 +28,6 @@ namespace Knobs {
 
 			bool _invert;
 
-			Valve& _turn( bool on );
-
 			Valve *_next;
 
 		public:
@@ -38,7 +36,7 @@ namespace Knobs {
 			Valve &invert();
 
 			Valve& active( bool on );
-			Valve& turn( bool on );
+			virtual Valve& turn( bool on );
 			bool active();
 			Valve& on();
 			Valve& off();
@@ -48,13 +46,21 @@ namespace Knobs {
 			Valve& restore();
 	};
 
+	class DoubleValve : public Valve {
+
+		private:
+			Valve &_other;
+
+		public: 
+			DoubleValve( pin_t pin, Valve &other );
+
+			virtual Valve& turn( bool on );
+	};
 
 	class Transducer {
 
 		private:
 			Valve *_first;
-
-			inline Transducer& _turn( bool on );
 
 		public:
 

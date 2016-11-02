@@ -23,13 +23,45 @@ namespace Knobs {
 	typedef bool (*callback_t)( Device &dev, Handler &handler, value_t newState, value_t oldState, time_t count );
 
 	enum HandlerType {
-		PUSH=0, ACTIVATE=0,
-		RELEASE=1, DEACTIVATE=1,
-		HOLD=2,
-		CLICK=3,
-		TOGGLE=4,
-		DOUBLECLICK=5
+		HT_PUSH=0, HT_ACTIVATE=0,
+		HT_RELEASE=1, HT_DEACTIVATE=1,
+		HT_HOLD=2,
+		HT_CLICK=3,
+		HT_TOGGLE=4,
+		HT_DOUBLECLICK=5,
+		HT_CHANGE=6,
+		HT_RISE=7,
+		HT_FALL=8
 	};
+
+	class Fitting {
+
+		public:
+			virtual bool call( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count ) = 0;
+	};
+
+	class SmallFitting : public Fitting {
+		private:
+			minimal_callback_t _callback;
+		public:
+			SmallFitting( minimal_callback_t callback );
+			virtual bool call( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count );
+	};
+
+	class MediumFitting : public Fitting {
+		private:
+			bool (*callback)();
+		public:
+			virtual bool call( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count );
+	};
+
+	class LargeFitting : public Fitting {
+		private:
+			bool (*callback)();
+		public:
+			virtual bool call( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count );
+	};
+
 
 	class Handler {
 
@@ -53,7 +85,8 @@ namespace Knobs {
 			Handler( HandlerType type, minimal_callback_t callback );
 			Handler( HandlerType type, callback_t callback );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t count ) = 0;
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t count ) = 0;
 
 	};
 
@@ -65,7 +98,8 @@ namespace Knobs {
 			Push( callback_t callback );
 			Push( minimal_callback_t callback );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 
 	};
 	typedef Push Activate;
@@ -77,7 +111,8 @@ namespace Knobs {
 			Release( callback_t callback );
 			Release( minimal_callback_t callback );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 
 	};
 	typedef Release Deactivate;
@@ -88,7 +123,8 @@ namespace Knobs {
 			Toggle( callback_t callback );
 			Toggle( minimal_callback_t callback );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 	};
 
 	class Click : public Handler {
@@ -109,7 +145,8 @@ namespace Knobs {
 			Click( minimal_callback_t callback );
 			Click( minimal_callback_t callback, time_t maxTime );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 	};
 
 
@@ -138,7 +175,8 @@ namespace Knobs {
 			DoubleClick( minimal_callback_t callback, value_t maxClicks );
 			DoubleClick( minimal_callback_t callback, value_t maxClicks, time_t maxTimeClick, time_t maxTimeInbetween );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 
 	};
 
@@ -155,7 +193,8 @@ namespace Knobs {
 			Hold( callback_t callback, time_t time );
 			Hold( minimal_callback_t callback, time_t time );
 
-			virtual bool handle( Device &dev, value_t newState, value_t oldState, time_t time );
+			virtual bool handle( Device &dev,
+					value_t newState, value_t oldState, time_t time );
 
 			Hold& continues( bool on );
 
@@ -171,7 +210,7 @@ namespace Knobs {
 			Handler * _firstHandler;
 
 		protected:
-			void _activate( bool newState, bool oldState, time_t count );
+			void _activate( value_t newState, value_t oldState, time_t count );
 
 		public:
 			virtual void loop() = 0;
@@ -222,10 +261,6 @@ namespace Knobs {
 			Knob & onTrippleClick( callback_t * cb );
 			Knob & onNTuppleClick( callback_t * cb, uint8_t clicks );
 			*/
-
-	};
-
-	class Lever {
 
 	};
 
