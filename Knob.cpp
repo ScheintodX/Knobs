@@ -8,6 +8,13 @@
 
 using namespace Knobs;
 
+static inline knob_time_t MIN( knob_time_t v1, knob_time_t v2 ) {
+	return v1 < v2 ? v1 : v2;
+}
+static inline knob_time_t MAX( knob_time_t v1, knob_time_t v2 ) {
+	return v1 > v2 ? v1 : v2;
+}
+
 /*****************************************************************************
 *
 *   D e v i c e
@@ -22,7 +29,7 @@ Device& Device::on( Handler &handler ){
 	return *this;
 }
 
-void Device::_activate( value_t newState, value_t oldState, time_t time ) {
+void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	Handler *handler;
 	bool cont;
@@ -87,36 +94,25 @@ Knob::Knob( uint8_t pin )
 	pinMode( pin, INPUT );
 }
 
-value_t Knob::value() {
+knob_value_t Knob::value() {
 
 	return _value;
 }
 
-static inline time_t MIN( time_t v1, time_t v2 ) {
-
-	return v1 < v2 ? v1 : v2;
-}
-static inline time_t MAX( time_t v1, time_t v2 ) {
-
-	return v1 > v2 ? v1 : v2;
-}
-
 void Knob::loop() {
 
-	time_t now = millis(),
+	knob_time_t now = millis(),
 	       delta = _lastTime < now ?
 		   		now - _lastTime :
-				(((time_t)-1) - _lastTime) + now +1; // compensate for overrun every 50 days
+				(((knob_time_t)-1) - _lastTime) + now +1; // compensate for overrun every 50 days
 	       ;
 
-	value_t oldValue = _value,
+	knob_value_t oldValue = _value,
 	        value = _read()
 	        ;
 
 
 	_lastTime = now;
-
-	//Serial.print( value );
 
 	if( value ) {
 
@@ -139,7 +135,7 @@ void Knob::loop() {
 	}
 }
 
-Knob& Knob::debounce( time_t time ) {
+Knob& Knob::debounce( knob_time_t time ) {
 	_timeDebounce = time;
 	return *this;
 }
@@ -156,22 +152,32 @@ Handler::Handler( HandlerType type, callback_t callback )
 Handler::Handler( HandlerType type, minimal_callback_t callback )
 		: _cb( NULL ), _cbm( callback ), type( type ) {}
 
-bool Handler::_callback( Device &dev, value_t newState, value_t oldState, time_t count ) {
+bool Handler::_callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
 
 	if( _cbm ) {
-		_cbm();
+		_cbm( newState );
 		return true;
 	//} else if( _cbs ) return _cbs( newState, oldState, count );
 	} else return _cb( dev, *this, newState, oldState, count );
 }
 
 
+// == Always ==
+
+Always::Always( callback_t callback ) : Handler( HT_ALWAYS, callback ) {}
+Always::Always( minimal_callback_t callback ) : Handler( HT_ALWAYS, callback ) {}
+
+bool Always::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
+
+	return _callback( dev, newState, oldState, time );
+}
+
 // == Push ==
 
 Push::Push( callback_t callback ) : Handler( HT_PUSH, callback ) {}
 Push::Push( minimal_callback_t callback ) : Handler( HT_PUSH, callback ) {}
 
-bool Push::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool Push::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	if( newState && !oldState )
 			return _callback( dev, newState, oldState, time );
@@ -185,7 +191,7 @@ bool Push::handle( Device &dev, value_t newState, value_t oldState, time_t time 
 Release::Release( callback_t callback ) : Handler( HT_RELEASE, callback ) {}
 Release::Release( minimal_callback_t callback ) : Handler( HT_RELEASE, callback ) {}
 
-bool Release::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool Release::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	if( !newState && oldState )
 			return _callback( dev, newState, oldState, time );
@@ -199,7 +205,7 @@ bool Release::handle( Device &dev, value_t newState, value_t oldState, time_t ti
 Toggle::Toggle( callback_t callback ) : Handler( HT_TOGGLE, callback ) {}
 Toggle::Toggle( minimal_callback_t callback ) : Handler( HT_TOGGLE, callback ) {}
 
-bool Toggle::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool Toggle::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	if( newState != oldState )
 			return _callback( dev, newState, oldState, time );
@@ -210,11 +216,11 @@ bool Toggle::handle( Device &dev, value_t newState, value_t oldState, time_t tim
 
 // == Click ==
 
-Click::Click( HandlerType type, callback_t callback, time_t maxTime )
+Click::Click( HandlerType type, callback_t callback, knob_time_t maxTime )
 		: Handler( type, callback )
 		, _maxTimeClick( maxTime )
 		{}
-Click::Click( HandlerType type, minimal_callback_t callback, time_t maxTime )
+Click::Click( HandlerType type, minimal_callback_t callback, knob_time_t maxTime )
 		: Handler( type, callback )
 		, _maxTimeClick( maxTime )
 		{}
@@ -224,7 +230,7 @@ Click::Click( callback_t callback )
 		, _maxTimeClick( MAX_TIME_CLICK )
 		{}
 
-Click::Click( callback_t callback, time_t maxTime )
+Click::Click( callback_t callback, knob_time_t maxTime )
 		: Handler( HT_CLICK, callback )
 		, _maxTimeClick( maxTime )
 		{}
@@ -234,14 +240,14 @@ Click::Click( minimal_callback_t callback )
 		, _maxTimeClick( MAX_TIME_CLICK )
 		{}
 
-Click::Click( minimal_callback_t callback, time_t maxTime )
+Click::Click( minimal_callback_t callback, knob_time_t maxTime )
 		: Handler( HT_CLICK, callback )
 		, _maxTimeClick( maxTime )
 		{}
 
-bool Click::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool Click::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
-	time_t now = millis();
+	knob_time_t now = millis();
 
 	if( newState != oldState ) {
 
@@ -274,7 +280,7 @@ DoubleClick::DoubleClick( callback_t callback )
 	_timeStartSequence = 0;
 }
 
-DoubleClick::DoubleClick( callback_t callback, value_t maxClicks )
+DoubleClick::DoubleClick( callback_t callback, knob_value_t maxClicks )
 		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
 		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
 		, _maxClicks( 2 )
@@ -284,7 +290,7 @@ DoubleClick::DoubleClick( callback_t callback, value_t maxClicks )
 	_timeStartSequence = 0;
 }
 
-DoubleClick::DoubleClick( callback_t callback, value_t maxClicks, time_t maxTimeClick, time_t maxTimeInbetween )
+DoubleClick::DoubleClick( callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
 		: Click( HT_DOUBLECLICK, callback, maxTimeClick )
 		, _maxTimeInbetween( maxTimeInbetween )
 		, _maxClicks( maxClicks )
@@ -304,7 +310,7 @@ DoubleClick::DoubleClick( minimal_callback_t callback )
 	_timeStartSequence = 0;
 }
 
-DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks )
+DoubleClick::DoubleClick( minimal_callback_t callback, knob_value_t maxClicks )
 		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
 		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
 		, _maxClicks( 2 )
@@ -314,7 +320,7 @@ DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks )
 	_timeStartSequence = 0;
 }
 
-DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks, time_t maxTimeClick, time_t maxTimeInbetween )
+DoubleClick::DoubleClick( minimal_callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
 		: Click( HT_DOUBLECLICK, callback, maxTimeClick )
 		, _maxTimeInbetween( maxTimeInbetween )
 		, _maxClicks( maxClicks )
@@ -325,9 +331,9 @@ DoubleClick::DoubleClick( minimal_callback_t callback, value_t maxClicks, time_t
 }
 
 
-bool DoubleClick::_callback( Device &dev, value_t newValue, value_t oldValue, time_t count ) {
+bool DoubleClick::_callback( Device &dev, knob_value_t newValue, knob_value_t oldValue, knob_time_t count ) {
 
-	time_t now = millis(),
+	knob_time_t now = millis(),
 	       delta = now-_timeStartSequence
 		   ;
 
@@ -355,7 +361,7 @@ bool DoubleClick::_callback( Device &dev, value_t newValue, value_t oldValue, ti
 	return true;
 }
 
-bool DoubleClick::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool DoubleClick::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	return Click::handle( dev, newState, oldState, time );
 
@@ -363,7 +369,7 @@ bool DoubleClick::handle( Device &dev, value_t newState, value_t oldState, time_
 
 // == Hold ==
 
-Hold::Hold( callback_t callback, time_t time ) 
+Hold::Hold( callback_t callback, knob_time_t time ) 
 		: Handler( HT_HOLD, callback ) 
 		, _timeHold( time )
 		{
@@ -371,7 +377,7 @@ Hold::Hold( callback_t callback, time_t time )
 	_continues = false;
 	_hasSent = false;
 }
-Hold::Hold( minimal_callback_t callback, time_t time ) 
+Hold::Hold( minimal_callback_t callback, knob_time_t time ) 
 		: Handler( HT_HOLD, callback ) 
 		, _timeHold( time )
 		{
@@ -380,7 +386,7 @@ Hold::Hold( minimal_callback_t callback, time_t time )
 	_hasSent = false;
 }
 
-bool Hold::handle( Device &dev, value_t newState, value_t oldState, time_t time ) {
+bool Hold::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	if( newState && time >= _timeHold && ( !_hasSent || _continues ) ) {
 
@@ -403,6 +409,79 @@ Hold& Hold::continues( bool on ) {
 	return *this;
 }
 
+
+
+// === Over ====
+
+Over::Over( callback_t callback, knob_value_t val ) 
+		: Handler( HT_OVER, callback ) 
+		, _val( val )
+		{ }
+
+Over::Over( minimal_callback_t callback, knob_value_t val ) 
+		: Handler( HT_OVER, callback ) 
+		, _val( val )
+		{ }
+
+bool Over::handle( Device &dev,
+		knob_value_t newState, knob_value_t oldState, knob_time_t time ){
+
+	if( oldState < _val && newState >= _val )
+			return _callback( dev, newState, oldState, time );
+
+	return false;
+
+}
+
+
+// === Under ====
+
+Under::Under( callback_t callback, knob_value_t val ) 
+		: Handler( HT_UNDER, callback ) 
+		, _val( val )
+		{ }
+
+Under::Under( minimal_callback_t callback, knob_value_t val ) 
+		: Handler( HT_UNDER, callback ) 
+		, _val( val )
+		{ }
+
+bool Under::handle( Device &dev,
+		knob_value_t newState, knob_value_t oldState, knob_time_t time ){
+
+	if( oldState > _val && newState <= _val )
+			return _callback( dev, newState, oldState, time );
+
+	return false;
+
+}
+
+// === Hyseresis ====
+
+Hysteresis::Hysteresis( callback_t callback,
+		knob_value_t lower_bound, knob_value_t upper_bound ) 
+		: Handler( HT_OVER, callback ) 
+		, _upper_bound( upper_bound )
+		, _lower_bound( lower_bound )
+		{ }
+
+Hysteresis::Hysteresis( minimal_callback_t callback,
+		knob_value_t lower_bound, knob_value_t upper_bound ) 
+		: Handler( HT_OVER, callback ) 
+		, _upper_bound( upper_bound )
+		, _lower_bound( lower_bound )
+		{ }
+
+bool Hysteresis::handle( Device &dev,
+		knob_value_t newState, knob_value_t oldState, knob_time_t time ){
+
+	if( oldState < _upper_bound && newState >= _upper_bound )
+			return _callback( dev, newState, oldState, time );
+	if( oldState > _lower_bound && newState <= _lower_bound )
+			return _callback( dev, newState, oldState, time );
+
+	return false;
+}
 
 
 /*
@@ -448,8 +527,6 @@ Panel& Panel::operator <<( Device &dev ) {
 }
 
 void Panel::loop() {
-
-	//Serial.print( "." );
 
 	Device *dev;
 

@@ -17,6 +17,25 @@ namespace Knobs {
 
 	class Transducer;
 
+	/*
+	class Switchable {
+		virtual Switchable& active( bool on ) = 0;
+		virtual bool active() = 0;
+		virtual Switchable& on() = 0;
+		virtual Switchable& off() = 0;
+		virtual bool toggle() = 0;
+	};
+	*/
+
+	/*
+	class Chainable {
+		private:
+			Chainable *_next;
+		public:
+			Chainable& prepend( Chainable &next );
+	};
+	*/
+
 	class Valve {
 
 		friend class Transducer;
@@ -27,16 +46,19 @@ namespace Knobs {
 			bool _stored;
 
 			bool _invert;
+			bool _inputWhenOff;
 
 			Valve *_next;
 
 		public:
 			Valve( pin_t pin );
 
-			Valve &invert();
+			Valve &invert( bool on );
+			Valve &inputWhenOff( bool on );
+
+			virtual Valve& turn( bool on );
 
 			Valve& active( bool on );
-			virtual Valve& turn( bool on );
 			bool active();
 			Valve& on();
 			Valve& off();
@@ -44,15 +66,18 @@ namespace Knobs {
 
 			Valve& store();
 			Valve& restore();
+
+			const pin_t pin();
 	};
 
 	class DoubleValve : public Valve {
 
 		private:
-			Valve &_other;
+			Valve &_one;
+			Valve &_two;
 
 		public: 
-			DoubleValve( pin_t pin, Valve &other );
+			DoubleValve( Valve &one, Valve &two );
 
 			virtual Valve& turn( bool on );
 	};
@@ -84,6 +109,8 @@ namespace Knobs {
 			Transducer& on();
 			Transducer& off();
 			Transducer& toggle();
+
+			Transducer& activeMask( uint32_t mask );
 
 			Transducer &store();
 			Transducer &restore();

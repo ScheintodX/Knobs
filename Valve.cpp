@@ -1,6 +1,7 @@
 #include "Valve.h"
 
 #include <Arduino.h>
+#include <E.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-Wpedantic"
@@ -8,24 +9,44 @@
 
 using namespace Knobs;
 
+/*
+Chainable& Chainable::prepend( Chainable &next ) {
+
+	next._next = this;
+
+	return *this;
+}
+*/
+
 Valve::Valve( pin_t pin ) 
 		: _pin( pin ){
 
 	_active = false;
 	_invert = false;
 	_stored = false;
-
-	pinMode( pin, OUTPUT );
+	_inputWhenOff = false;
 }
 
-Valve& Valve::invert() {
-	_invert = !_invert;
+Valve& Valve::invert( bool on ) {
+	_invert = on;
+	return *this;
+}
+Valve& Valve::inputWhenOff( bool on ) {
+	_inputWhenOff = on;
 	return *this;
 }
 
 Valve& Valve::turn( bool on ) {
+
 	_active = on;
+
+	echo( "turn", _active );
+
+	if( on ) pinMode( _pin, OUTPUT );
+	else if( _inputWhenOff ) pinMode( _pin, INPUT );
+
 	digitalWrite( _pin, _active ^ _invert );
+
 	return *this;
 }
 
@@ -61,19 +82,24 @@ Valve& Valve::restore() {
 	return turn( _active );
 }
 
+pin_t Valve::pin() {
+	return _pin;
+}
+
 /*
  * D O U B L E  V A L V E
  */
 
-DoubleValve::DoubleValve( pin_t pin, Valve &other )
-		: Valve( pin )
-		, _other( other )
+DoubleValve::DoubleValve( Valve &one, Valve &two )
+		: Valve( 0 )
+		, _one( one )
+		, _two( two )
 		{}
 
 Valve& DoubleValve::turn( bool on ) {
 
-	_other.turn( on );
-	return Valve::turn( on );
+	_two.turn( on );
+	return _one.turn( on );
 }
 
 
@@ -152,6 +178,16 @@ Transducer& Transducer::store() {
 }
 Transducer& Transducer::restore() {
 	TONALL( restore );
+	return *this;
+}
+Transducer& Transducer::activeMask( uint32_t mask ) {
+
+	Valve *val;
+	for( val = _first; val; val = val->_next ) {
+
+		val->active( mask&1 );
+		mask = mask >> 1;
+	}
 	return *this;
 }
 

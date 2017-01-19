@@ -8,17 +8,4 @@
 
 using namespace Knobs;
 
-void y() {
-
-}
-
-void x() {
-
-	SmallFitting f( y );
-
-	Click click( SmallFitting( y ) );
-
-}
-
-
 #pragma GCC diagnostic pop

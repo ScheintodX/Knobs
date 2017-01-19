@@ -8,6 +8,7 @@
 
 namespace Knobs {
 
+	/*
 	class Cord {
 
 		private:
@@ -18,6 +19,7 @@ namespace Knobs {
 			Cord( Valve &valve, Knob &knob );
 
 	};
+	*/
 }
 
 #endif
