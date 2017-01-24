@@ -1,15 +1,20 @@
 #ifndef LEVER_H
 #define LEVER_H
 
+#include "Knob.h"
+
 #include <stdint.h>
 #include <time.h>
-#include "Knob.h"
 
 //#warning "Lever"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-Wpedantic"
 #pragma GCC diagnostic error "-Wreturn-type"
+
+#ifndef KNOBS_MODIFIER_CANISTER_SIZE
+#define KNOBS_MODIFIER_CANISTER_SIZE 5
+#endif
 
 namespace Knobs {
 
@@ -25,7 +30,7 @@ namespace Knobs {
 			knob_value_t _read();
 
 		public:
-			AnalogDevice( pin_t pin );
+			AnalogDevice( const char *name, pin_t pin );
 
 			AnalogDevice& pullup( bool on );
 	};
@@ -45,7 +50,7 @@ namespace Knobs {
 	class Lever : public AnalogDevice {
 
 		private:
-			LeverModifier *_firstModifier;
+			Canister<LeverModifier,KNOBS_MODIFIER_CANISTER_SIZE> _modifiers;
 
 			knob_value_t _old;
 			knob_time_t _lastTime;
@@ -59,7 +64,7 @@ namespace Knobs {
 			const knob_value_t maxValue;
 
 		public:
-			Lever( pin_t pin, knob_value_t min, knob_value_t max );
+			Lever( const char *name, pin_t pin, knob_value_t min, knob_value_t max );
 
 			Lever& modify( LeverModifier &modifier );
 
@@ -74,9 +79,6 @@ namespace Knobs {
 	class LeverModifier {
 
 		friend class Lever;
-
-		private:
-			LeverModifier *_next;
 
 		public:
 			virtual bool modify( Lever &lever, knob_value_t *val ) = 0;

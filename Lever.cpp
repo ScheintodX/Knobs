@@ -1,9 +1,11 @@
 #include "Lever.h"
-#include <E.h>
 
 #include <Arduino.h>
+// fix f. silly macros
+#undef min
+#undef max
 
-#include <algorithm>
+#include "algorithm.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-Wpedantic"
@@ -17,8 +19,9 @@ using namespace Knobs;
 *
 *****************************************************************************/
 
-AnalogDevice::AnalogDevice( pin_t pin ) 
-		: _pin( pin ) {
+AnalogDevice::AnalogDevice( const char *name, pin_t pin ) 
+		: Device( name )
+		, _pin( pin ) {
 
 	pinMode( pin, INPUT );
 }
@@ -41,21 +44,17 @@ AnalogDevice& AnalogDevice::pullup( bool on ) {
 *
 *****************************************************************************/
 
-Lever::Lever( pin_t pin, knob_value_t min, knob_value_t max ) 
-		: AnalogDevice( pin )
+Lever::Lever( const char *name, pin_t pin, knob_value_t min, knob_value_t max ) 
+		: AnalogDevice( name, pin )
 		, minValue( min ), maxValue( max ) {
 
 	_old = 0;
 	_lastTime = 0;
-
-	_firstModifier = NULL;
 }
 
 Lever& Lever::modify( LeverModifier &modifier ) {
 
-	modifier._next = _firstModifier;
-	_firstModifier = &modifier;
-
+	_modifiers.add( modifier );
 	return *this;
 }
 
@@ -64,7 +63,7 @@ bool Lever::modify( knob_value_t *val_p ) {
 	register bool ok = true;
 	register LeverModifier *mod;
 
-	for( mod = _firstModifier; mod && ok; mod = mod->_next ) {
+	for( mod = _modifiers.first(); mod && ok; mod = _modifiers.next() ) {
 
 		ok = mod->modify( *this, val_p );
 	}
@@ -219,14 +218,14 @@ bool Deviation::modify( Lever &lever, knob_value_t *val ) {
 	knob_value_t tmp = *val;
 	knob_value_t delta;
 
-	_min = std::min( _min, tmp );
-	_max = std::max( _max, tmp );
+	_min = Math::min( _min, tmp );
+	_max = Math::max( _max, tmp );
 
 	ok = AverageTime::modify( lever, &tmp );
 
 	if( ok ) {
 
-		delta = ( std::abs( _max - tmp ), std::abs( tmp - _min ) ) / 2;
+		delta = ( Math::abs( _max - tmp ), Math::abs( tmp - _min ) ) / 2;
 
 		*val = delta;
 
@@ -252,8 +251,6 @@ bool RunningDeviation::modify( Lever &lever, knob_value_t *val ) {
 
 	knob_value_t avg = *val;
 
-	Serial.print( *val );
-
 	bool ok = RunningAverage::modify( lever, &avg );
 
 	if( *val < _avg ) {
@@ -272,7 +269,7 @@ bool RunningDeviation::modify( Lever &lever, knob_value_t *val ) {
 
 	if( !ok ) return false;
 
-	*val = ( std::abs( _min ) + std::abs( _max ) ) / 2;
+	*val = ( Math::abs( _min ) + Math::abs( _max ) ) / 2;
 
 	return true;
 

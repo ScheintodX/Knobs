@@ -21,10 +21,11 @@ static inline knob_time_t MAX( knob_time_t v1, knob_time_t v2 ) {
 *
 *****************************************************************************/
 
+Device::Device( const char *name ) : _name( name ){}
+
 Device& Device::on( Handler &handler ){
 
-	handler._next = _firstHandler;
-	_firstHandler = &handler;
+	_handlers.add( handler );
 
 	return *this;
 }
@@ -32,9 +33,10 @@ Device& Device::on( Handler &handler ){
 void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
 	Handler *handler;
+	
 	bool cont;
-
-	for( handler = _firstHandler; handler; handler = handler->_next ) {
+	
+	for( handler = _handlers.first(); handler; handler = _handlers.next() ) {
 
 		cont = handler->handle( *this, newState, oldState, time );
 
@@ -49,7 +51,7 @@ void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_
 *
 *****************************************************************************/
 
-BooleanDevice::BooleanDevice( pin_t pin) : _pin( pin ) {
+BooleanDevice::BooleanDevice( const char *name, pin_t pin) : Device( name ), _pin( pin ) {
 
 	_invert = false;
 }
@@ -73,6 +75,11 @@ bool BooleanDevice::_read() {
 	return _invert ? !val : val;
 }
 
+pin_t BooleanDevice::pin() {
+	
+	return _pin;
+}
+
 
 /*****************************************************************************
 *
@@ -80,8 +87,8 @@ bool BooleanDevice::_read() {
 *
 *****************************************************************************/
 
-Knob::Knob( uint8_t pin ) 
-		: BooleanDevice( pin )
+Knob::Knob( const char *name, uint8_t pin ) 
+		: BooleanDevice( name, pin )
 {
 
 	_value = 0;
@@ -140,6 +147,24 @@ Knob& Knob::debounce( knob_time_t time ) {
 	return *this;
 }
 
+/*
+Knobber::Knobber( pin_t pin, Knob &other ) 
+		: Knob( pin )
+		, _other( other ){}
+
+void Knobber::_activate( knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
+	Knob::_activate( newState, oldState, count );
+	_other._activate( newState, oldState, count );
+}
+
+void Knobber::loop() {
+
+	Knob::loop();
+	_other.loop();
+}
+*/
+
+
 
 /*****************************************************************************
 *
@@ -155,8 +180,7 @@ Handler::Handler( HandlerType type, minimal_callback_t callback )
 bool Handler::_callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
 
 	if( _cbm ) {
-		_cbm( newState );
-		return true;
+		return _cbm( newState );
 	//} else if( _cbs ) return _cbs( newState, oldState, count );
 	} else return _cb( dev, *this, newState, oldState, count );
 }
@@ -367,6 +391,70 @@ bool DoubleClick::handle( Device &dev, knob_value_t newState, knob_value_t oldSt
 
 }
 
+
+// == MultiClick ==
+
+MultiClick::MultiClick( callback_t callback )
+		: Click( HT_MULTICLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		{
+	
+	_clicks = 0;
+	_timeLastClick = 0;
+}
+
+MultiClick::MultiClick( callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
+		: Click( HT_MULTICLICK, callback, maxTimeClick )
+		, _maxTimeInbetween( maxTimeInbetween )
+		{
+	
+	_clicks = 0;
+	_timeLastClick = 0;
+}
+
+MultiClick::MultiClick( minimal_callback_t callback )
+		: Click( HT_MULTICLICK, callback, MAX_TIME_CLICK )
+		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
+		{
+	
+	_clicks = 0;
+	_timeLastClick = 0;
+}
+
+MultiClick::MultiClick( minimal_callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
+		: Click( HT_MULTICLICK, callback, maxTimeClick )
+		, _maxTimeInbetween( maxTimeInbetween )
+		{
+	
+	_clicks = 0;
+	_timeLastClick = 0;
+}
+
+
+bool MultiClick::_callback( Device &dev, knob_value_t newValue, knob_value_t oldValue, knob_time_t count ) {
+
+	knob_time_t now = millis(),
+	       delta = now-_timeLastClick
+		   ;
+
+	_timeLastClick = now;
+
+	if( delta < _maxTimeInbetween ) {
+		_clicks ++;
+		return Click::_callback( dev, _clicks, _clicks-1, delta );
+	} else {
+		_clicks = 0;
+	}
+
+	return true;
+}
+
+bool MultiClick::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
+
+	return Click::handle( dev, newState, oldState, time );
+
+}
+
 // == Hold ==
 
 Hold::Hold( callback_t callback, knob_time_t time ) 
@@ -488,40 +576,49 @@ bool Hysteresis::handle( Device &dev,
  * ## P A N E L ##
  */
 
-Panel::Panel(){}
+Panel::Panel( const char *name )
+		: _name( name ){}
 
-Panel::Panel( Device &k1 ) {
+Panel::Panel( const char *name, Device &k1 )
+		: _name( name ){
 	*this << k1;
 }
-Panel::Panel( Device &k1, Device &k2 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2 )
+		: _name( name ){
 	*this << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3 )
+		: _name( name ){
 	*this << k3 << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4 )
+		: _name( name ){
 	*this << k4 << k3 << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4, 
+		Device &k5 )
+		: _name( name ){
 	*this << k5 << k4 << k3 << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-		Device &k6 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+		Device &k5, Device &k6 )
+		: _name( name ){
 	*this << k6 << k5 << k4 << k3 << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-		Device &k6, Device &k7 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+		Device &k5, Device &k6, Device &k7 )
+		: _name( name ){
 	*this << k7 << k6 << k5 << k4 << k3 << k2 << k1;
 }
-Panel::Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-		Device &k6, Device &k7, Device &k8 ) {
+Panel::Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+		Device &k5, Device &k6, Device &k7, Device &k8 )
+		: _name( name ) {
 	*this << k8 << k7 << k6 << k5 << k4 << k3 << k2 << k1;
 }
 
 Panel& Panel::operator <<( Device &dev ) {
 
-	dev._next = _first;
-	_first = &dev;
+	_devices.add( dev );
 
 	return *this;
 }
@@ -530,10 +627,14 @@ void Panel::loop() {
 
 	Device *dev;
 
-	for( dev = _first; dev; dev = dev->_next ) {
+	for( dev = _devices.first(); dev; dev = _devices.next() ) {
 
 		dev->loop();
 	}
+}
+
+const char * Panel::name() {
+	return _name;
 }
 
 #pragma GCC diagnostic pop

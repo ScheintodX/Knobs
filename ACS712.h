@@ -22,7 +22,7 @@ namespace Knobs {
 
 		public:
 
-			ACS712( pin_t pin, ACS_VERSION version, knob_value_t max, knob_value_t samples );
+			ACS712( const char *name, pin_t pin, ACS_VERSION version, knob_value_t max, knob_value_t samples );
 
 			virtual void loop();
 

@@ -1,7 +1,6 @@
 #include "Valve.h"
 
 #include <Arduino.h>
-#include <E.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-Wpedantic"
@@ -9,22 +8,40 @@
 
 using namespace Knobs;
 
-/*
-Chainable& Chainable::prepend( Chainable &next ) {
-
-	next._next = this;
-
-	return *this;
-}
-*/
-
-Valve::Valve( pin_t pin ) 
-		: _pin( pin ){
+Valve::Valve( const char * const name, pin_t pin ) : _name( name ), _pin( pin ) {
 
 	_active = false;
 	_invert = false;
 	_stored = false;
 	_inputWhenOff = false;
+	_isInit = false;
+}
+
+Valve& Valve::begin(){
+	_init();
+	return *this;
+}
+
+void Valve::_init() {
+
+	if( _inputWhenOff ) {
+		_pinMode( _active );
+	} else {
+		pinMode( _pin, OUTPUT );
+	}
+
+	_isInit = true;
+}
+
+void Valve::_pinMode( bool to ) {
+
+	if( to ) pinMode( _pin, OUTPUT );
+	else pinMode( _pin, INPUT );
+}
+
+bool Valve::_modify( bool on ) {
+
+	return _invert ? !on : on;
 }
 
 Valve& Valve::invert( bool on ) {
@@ -35,30 +52,33 @@ Valve& Valve::inputWhenOff( bool on ) {
 	_inputWhenOff = on;
 	return *this;
 }
-
-Valve& Valve::turn( bool on ) {
-
-	_active = on;
-
-	echo( "turn", _active );
-
-	if( on ) pinMode( _pin, OUTPUT );
-	else if( _inputWhenOff ) pinMode( _pin, INPUT );
-
-	digitalWrite( _pin, _active ^ _invert );
-
+Valve& Valve::enslave( Valve &slave ) {
+	_slave = &slave;
 	return *this;
 }
 
 Valve& Valve::active( bool on ) {
-	return turn( on );
+
+	bool to = _modify( on );
+
+	_active = on;
+
+	if( _inputWhenOff ) _pinMode( to );
+
+	//_print( "turn", to );
+
+	digitalWrite( _pin, to );
+
+	if( _slave ) _slave->active( on );
+
+	return *this;
 }
 
 Valve& Valve::on() {
-	return turn( true );
+	return active( true );
 }
 Valve& Valve::off() {
-	return turn( false );
+	return active( false );
 }
 
 bool Valve::active() {
@@ -66,10 +86,10 @@ bool Valve::active() {
 	return _active;
 }
 
-bool Valve::toggle() {
+Valve& Valve::toggle() {
 
-	turn( !_active );
-	return _active;
+	active( !_active );
+	return *this;
 }
 
 
@@ -79,27 +99,75 @@ Valve& Valve::store() {
 }
 Valve& Valve::restore() {
 	_active = _stored;
-	return turn( _active );
+	return active( _active );
 }
 
 pin_t Valve::pin() {
 	return _pin;
 }
+const char * Valve::name() {
+	return _name;
+}
+
+void Valve::loop( knob_time_t time ) {}
+
+Valve& Valve::_print( const char *msg, bool val ) {
+
+	Serial.print( msg );
+	Serial.print( " " );
+	Serial.print( _name );
+	Serial.print( "(" );
+	Serial.print( _pin );
+	Serial.print( "/" );
+	Serial.print( _invert );
+	Serial.print( "> " );
+	Serial.println( val );
+
+	return *this;
+}
 
 /*
- * D O U B L E  V A L V E
+ * T I M E D  V A L V E
  */
 
-DoubleValve::DoubleValve( Valve &one, Valve &two )
-		: Valve( 0 )
-		, _one( one )
-		, _two( two )
-		{}
+TimedValve::TimedValve( const char * const name, Valve &nested,
+		knob_time_t holdTime, knob_time_t notifyTime ) 
+		: Valve( name, 0 )
+		, _nested( nested )
+		, _holdTime( holdTime )
+		, _notifyTime( notifyTime )
+		{
+		
+	_active = false;
+}
 
-Valve& DoubleValve::turn( bool on ) {
+void TimedValve::_start() {
 
-	_two.turn( on );
-	return _one.turn( on );
+	knob_time_t now = millis();
+
+	_holdUntil = now + _holdTime;
+	_notifyAt = now + _notifyTime;
+	_active = true;
+}
+
+void TimedValve::loop( knob_time_t time ) {
+
+	if( !_active ) return;
+
+}
+
+TimedValve& TimedValve::keep() {
+
+	_active = false;
+
+	return *this;
+}
+
+Valve& TimedValve::active( bool on ) {
+
+	_nested.active( on );
+
+	return *this;
 }
 
 
@@ -107,66 +175,77 @@ Valve& DoubleValve::turn( bool on ) {
  * T R A N S D U C E R
  */
 
-Transducer::Transducer(){}
-Transducer::Transducer( Valve &v1 ){
+Transducer::Transducer( const char *name )
+		: _name( name ) {}
+Transducer::Transducer( const char *name, Valve &v1 )
+		: _name( name ) {
 	*this << v1;
 }
-Transducer::Transducer( Valve &v1, Valve &v2 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2 )
+		: _name( name ) {
 	*this << v1 << v2;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3 )
+		: _name( name ) {
 	*this << v1 << v2 << v3;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3,
+		Valve &v4 )
+		: _name( name ) {
 	*this << v1 << v2 << v3 << v4;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3,
+		Valve &v4, Valve &v5 )
+		: _name( name ) {
 	*this << v1 << v2 << v3 << v4 << v5;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
-		Valve &v6 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3,
+		Valve &v4, Valve &v5, Valve &v6 )
+		: _name( name ) {
 	*this << v1 << v2 << v3 << v4 << v5 << v6;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
-		Valve &v6, Valve &v7 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3,
+		Valve &v4, Valve &v5, Valve &v6, Valve &v7 )
+		: _name( name ) {
 	*this << v1 << v2 << v3 << v4 << v5 << v6 << v7;
 }
-Transducer::Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
-		Valve &v6, Valve &v7, Valve &v8 ){
+Transducer::Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3,
+		Valve &v4, Valve &v5, Valve &v6, Valve &v7, Valve &v8 )
+		: _name( name ) {
 	*this << v1 << v2 << v3 << v4 << v5 << v6 << v7 << v8;
 }
 
 Transducer& Transducer::operator <<( Valve &valve ) {
 
-	valve._next = _first;
-	_first = &valve;
+	_valves.add( valve );
 	return *this;
 }
 
 #define TONALL( m ) \
-			Valve *val; \
-			for( val=_first; val; val = val->_next ) { \
-					val->m(); \
+			Valve *valve; \
+			for( valve=_valves.first(); valve; valve=_valves.next() ) { \
+					valve->m(); \
 			}
 #define TONALLP( m, p ) \
-			Valve *val; \
-			for( val=_first; val; val = val->_next ) { \
-					val->m( p ); \
+			Valve *valve; \
+			for( valve=_valves.first(); valve; valve=_valves.next() ) { \
+					valve->m( p ); \
 			}
 
-inline Transducer& Transducer::turn( bool on ) {
-
-	TONALLP( turn, on );
+Transducer& Transducer::begin() {
+	TONALL( begin );
 	return *this;
 }
-Transducer& Transducer::active( bool on ) {
-	return turn( on );
+inline Transducer& Transducer::active( bool on ) {
+
+	TONALLP( active, on );
+	return *this;
 }
 Transducer& Transducer::on() {
-	return turn( ON );
+	return active( ON );
 }
 Transducer& Transducer::off() {
-	return turn( OFF );
+	return active( OFF );
 }
 Transducer& Transducer::toggle() {
 	TONALL( toggle );
@@ -180,15 +259,56 @@ Transducer& Transducer::restore() {
 	TONALL( restore );
 	return *this;
 }
+Transducer& Transducer::print() {
+
+	Serial.print( "| " );
+	Valve *valve; \
+	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+		Serial.print( valve->active() ? "X" : "o" );
+		Serial.print( " " );
+	}
+	Serial.println( "|" );
+
+	return *this;
+}
 Transducer& Transducer::activeMask( uint32_t mask ) {
 
-	Valve *val;
-	for( val = _first; val; val = val->_next ) {
+	Valve *valve;
+	int count = 1;
 
-		val->active( mask&1 );
-		mask = mask >> 1;
+	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+
+		valve->active( mask & count );
+		count = count<<1;
 	}
 	return *this;
 }
+uint32_t Transducer::activeMask() {
 
+	uint32_t mask = 0;
+	int count = 1;
+	Valve *valve;
+
+	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+
+		mask |= valve->active() ? count : 0;
+		count = count<<1;
+	}
+	return mask;
+}
+
+const char * Transducer::name() {
+	return _name;
+}
+
+void Transducer::loop() {
+
+	Valve *valve;
+	knob_time_t now = millis();
+
+	for( valve = _valves.first(); valve; valve = _valves.next() ) {
+
+		valve->loop( now );
+	}
+}
 #pragma GCC diagnostic pop

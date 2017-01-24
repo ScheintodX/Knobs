@@ -2,28 +2,27 @@
 #define KNOB_H
 
 #include <stdint.h>
-#include <time.h>
 #include <climits>
-
-//#warning "Knob"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-Wpedantic"
 #pragma GCC diagnostic error "-Wreturn-type"
 
 #include "knobs_common.h"
+#include "Canister.h"
+
+#ifndef KNOBS_HANDLER_CANISTER_SIZE 
+	#define KNOBS_HANDLER_CANISTER_SIZE 5
+#endif
+#ifndef KNOBS_PANEL_CANISTER_SIZE 
+	#define KNOBS_PANEL_CANISTER_SIZE 20
+#endif
 
 
 /**
  * Everything is put in namespace Knobs in order to avoid conflicts
  */
 namespace Knobs {
-
-	typedef const uint8_t pin_t;
-	typedef int32_t knob_value_t;
-	typedef int64_t big_knob_value_t;
-	typedef int64_t knob_time_t;
-	typedef float knob_float_t;
 
 	#define KNOB_VAL_MAX INT_MAX
 	#define KNOB_VAL_MIN INT_MIN
@@ -32,7 +31,7 @@ namespace Knobs {
 	class Handler;
 	class Panel;
 
-	typedef void (*minimal_callback_t)( knob_value_t val );
+	typedef bool (*minimal_callback_t)( knob_value_t val );
 	typedef bool (*callback_t)( Device &dev, Handler &handler,
 			knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
@@ -44,12 +43,13 @@ namespace Knobs {
 		HT_CLICK=4,
 		HT_TOGGLE=5,
 		HT_DOUBLECLICK=6,
-		HT_CHANGE=7,
-		HT_RISE=8,
-		HT_FALL=9,
-		HT_OVER=10,
-		HT_UNDER=11,
-		HT_HYSTERESIS=12
+		HT_MULTICLICK=7,
+		HT_CHANGE=8,
+		HT_RISE=9,
+		HT_FALL=10,
+		HT_OVER=11,
+		HT_UNDER=12,
+		HT_HYSTERESIS=13
 	};
 
 
@@ -60,10 +60,6 @@ namespace Knobs {
 	class Handler {
 
 		friend class Device;
-
-		private:
-
-			Handler *_next;
 
 		protected:
 
@@ -191,6 +187,33 @@ namespace Knobs {
 
 	};
 
+	class MultiClick : public Click {
+
+		private:
+
+			static const knob_time_t MAX_TIME_CLICK = 250;
+			static const knob_time_t MAX_TIME_INBETWEEN = 750;
+
+			const knob_time_t _maxTimeInbetween;
+
+			knob_time_t _timeLastClick;
+			knob_value_t _clicks;
+
+		protected:
+
+			virtual bool _callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count );
+
+		public:
+			MultiClick( callback_t callback );
+			MultiClick( callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
+			MultiClick( minimal_callback_t callback );
+			MultiClick( minimal_callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
+
+			virtual bool handle( Device &dev,
+					knob_value_t newState, knob_value_t oldState, knob_time_t time );
+
+	};
+
 
 	class Hold : public Handler {
 
@@ -263,20 +286,50 @@ namespace Knobs {
 	 * All devices are connected and manage queues of handlers.
 	 * Handlers are added via the "on" method.
 	 */
+
 	class Device {
 
 		friend class Panel;
 
 		private:
-			Device *_next;
-			Handler * _firstHandler;
+			const char *_name;
+			Canister<Handler,KNOBS_HANDLER_CANISTER_SIZE> _handlers;
 
 		protected:
 			void _activate( knob_value_t newState, knob_value_t oldState, knob_time_t count );
+			Device( const char *name );
 
 		public:
 			virtual void loop() = 0;
 			Device& on( Handler &handler );
+
+			#define ON( WHAT ) \
+					inline Device& on ## WHAT( minimal_callback_t cb ) { \
+						on( *( new WHAT( cb ) ) ); \
+						return *this; \
+					}
+			#define ONP( WHAT, TYPE ) \
+					inline Device& on ## WHAT( minimal_callback_t cb, TYPE val ) { \
+						on( *( new WHAT( cb, val ) ) ); \
+						return *this; \
+					}
+			#define ONPP( WHAT, TYPE1, TYPE2 ) \
+					inline Device& on ## WHAT( minimal_callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( *( new WHAT( cb, val1, val2 ) ) ); \
+						return *this; \
+					}
+
+			ON( Always )
+			ON( Push )
+			ON( Release )
+			ON( Toggle )
+			ON( Click )
+			ON( DoubleClick )
+			ON( MultiClick )
+			ONP( Hold, knob_time_t )
+			ONP( Over, knob_value_t )
+			ONP( Under, knob_value_t )
+			ONPP( Hysteresis, knob_value_t, knob_value_t )
 	};
 
 	/**
@@ -291,10 +344,12 @@ namespace Knobs {
 			bool _read();
 
 		public:
-			BooleanDevice( pin_t pin );
+			BooleanDevice( const char *name, pin_t pin );
 
 			BooleanDevice& pullup( bool on );
 			BooleanDevice& invert( bool on );
+
+			pin_t pin();
 			
 	};
 
@@ -317,20 +372,30 @@ namespace Knobs {
 
 		public:
 
-			Knob( pin_t pin );
+			Knob( const char *name, pin_t pin );
 
 			Knob & debounce( knob_time_t time );
 
 			knob_value_t value();
 
 			virtual void loop();
-
-			/*
-			Knob & onTrippleClick( callback_t * cb );
-			Knob & onNTuppleClick( callback_t * cb, uint8_t clicks );
-			*/
-
+			
 	};
+
+	/*
+	class Knobber : public Knob {
+
+		private:
+			Knob &_other;
+
+		protected:
+			void _activate( knob_value_t newState, knob_value_t oldState, knob_time_t count );
+
+		public:
+			Knobber( pin_t pin, Knob &other );
+			virtual void loop();
+	};
+	*/
 
 	/**
 	 * Small helper class to get your knobs organized.
@@ -343,28 +408,32 @@ namespace Knobs {
 
 		private:
 
-			Device * _first;
+			const char *_name;
+			Canister<Device, KNOBS_PANEL_CANISTER_SIZE> _devices;
 
 		public:
 
-			Panel();
+			Panel( const char *name );
 
-			Panel( Device &k1 );
-			Panel( Device &k1, Device &k2 );
-			Panel( Device &k1, Device &k2, Device &k3 );
+			Panel( const char *name, Device &k1 );
+			Panel( const char *name, Device &k1, Device &k2 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3 );
 			//Panel( Device &k1, Device &k2, Device &k3, Device... rest );
-			Panel( Device &k1, Device &k2, Device &k3, Device &k4 );
-			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5 );
-			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-					Device &k6 );
-			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-					Device &k6, Device &k7 );
-			Panel( Device &k1, Device &k2, Device &k3, Device &k4, Device &k5,
-					Device &k6, Device &k7, Device &k8 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+					Device &k5 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+					Device &k5, Device &k6 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+					Device &k5, Device &k6, Device &k7 );
+			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
+					Device &k5, Device &k6, Device &k7, Device &k8 );
 
 			Panel& operator <<( Device &device );
 
 			void loop();
+
+			const char * name();
 
 	};
 

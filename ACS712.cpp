@@ -1,7 +1,6 @@
-#include <Arduino.h>
 #include "ACS712.h"
-#include <E.h>
-#include <algorithm>
+
+#include <Arduino.h>
 
 // Measured using 3.3v logic
 
@@ -15,9 +14,9 @@ static const float _ACS_MUL[] = {
 		_MV_PER_DIV/_ACS_SENS[ x30A ]
 };
 
-ACS712::ACS712( pin_t pin, ACS_VERSION version,
+ACS712::ACS712( const char *name, pin_t pin, ACS_VERSION version,
 		knob_value_t max, knob_value_t samples ) 
-		: Lever( pin, 0, max )
+		: Lever( name, pin, 0, max )
 		, _scale( _ACS_MUL[ version ] )
 		, _samples( samples )
 		{

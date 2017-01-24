@@ -8,6 +8,12 @@
 #pragma GCC diagnostic error "-Wreturn-type"
 
 #include "knobs_common.h"
+#include "Canister.h"
+#include "algorithm.h"
+
+#ifndef KNOBS_TRANSDUCER_CANISTER_SIZE
+	#define KNOBS_TRANSDUCER_CANISTER_SIZE 20
+#endif
 
 namespace Knobs {
 
@@ -28,19 +34,20 @@ namespace Knobs {
 	*/
 
 	/*
-	class Chainable {
-		private:
-			Chainable *_next;
-		public:
-			Chainable& prepend( Chainable &next );
-	};
+	class Fireman {
+		virtual void loop
+	}
 	*/
+
 
 	class Valve {
 
 		friend class Transducer;
+		friend class Fireman;
 
 		private:
+			const char * _name;
+
 			const pin_t _pin;
 			bool _active;
 			bool _stored;
@@ -48,72 +55,111 @@ namespace Knobs {
 			bool _invert;
 			bool _inputWhenOff;
 
-			Valve *_next;
+			bool _isInit;
+
+			Valve *_slave;
+
+			void _init();
+			void _pinMode( bool to );
+
+			virtual bool _modify( bool on );
+
+			Valve& _print( const char *msg, bool val );
 
 		public:
-			Valve( pin_t pin );
+			Valve( const char * const name, pin_t pin );
+
+			Valve &begin();
 
 			Valve &invert( bool on );
 			Valve &inputWhenOff( bool on );
 
-			virtual Valve& turn( bool on );
+			Valve &enslave( Valve &slave );
 
-			Valve& active( bool on );
+			virtual Valve& active( bool on );
+
 			bool active();
 			Valve& on();
 			Valve& off();
-			bool toggle();
+			Valve& toggle();
 
 			Valve& store();
 			Valve& restore();
 
-			const pin_t pin();
+			pin_t pin();
+			const char * name();
+
+			virtual void loop( knob_time_t time );
 	};
 
-	class DoubleValve : public Valve {
+
+	class TimedValve : public Valve {
 
 		private:
-			Valve &_one;
-			Valve &_two;
+			Valve &_nested;
+			const knob_time_t _holdTime;
+			const knob_time_t _notifyTime;
+			knob_time_t _holdUntil;
+			knob_time_t _notifyAt;
+			knob_time_t _active;
 
-		public: 
-			DoubleValve( Valve &one, Valve &two );
+		protected:
 
-			virtual Valve& turn( bool on );
+			void _start();
+
+		public:
+			TimedValve( const char * const name, Valve &nested,
+					knob_time_t holdTime, knob_time_t notifyTime );
+
+			virtual Valve& active( bool on );
+
+			TimedValve& keep();
+
+			virtual void loop( knob_time_t time );
 	};
+
 
 	class Transducer {
 
 		private:
-			Valve *_first;
+			const char *_name;
+			Canister<Valve, KNOBS_TRANSDUCER_CANISTER_SIZE> _valves;
 
 		public:
 
-			Transducer();
-			Transducer( Valve &v1 );
-			Transducer( Valve &v1, Valve &v2 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+			Transducer( const char *name );
+			Transducer( const char *name, Valve &v1 );
+			Transducer( const char *name, Valve &v1, Valve &v2 );
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3 );
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3, Valve &v4 );
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5 );
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
 					Valve &v6 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
 					Valve &v6, Valve &v7 );
-			Transducer( Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
+			Transducer( const char *name, Valve &v1, Valve &v2, Valve &v3, Valve &v4, Valve &v5,
 					Valve &v6, Valve &v7, Valve &v8 );
 
 			Transducer& operator<<( Valve &valve );
 
+			Transducer& begin();
+
 			Transducer& active( bool on );
-			Transducer& turn( bool on );
 			Transducer& on();
 			Transducer& off();
 			Transducer& toggle();
 
 			Transducer& activeMask( uint32_t mask );
+			uint32_t activeMask();
 
-			Transducer &store();
-			Transducer &restore();
+			Transducer& store();
+			Transducer& restore();
+
+			Transducer& print();
+
+			const char * name();
+
+			void loop();
 	};
 
 }
