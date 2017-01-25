@@ -104,20 +104,21 @@ Valve& Valve::toggle() {
 
 Valve& Valve::store() {
 
-	_print( "store", _active );
+	//_print( "store", _active );
 
 	_stored = _active;
 	return *this;
 }
 Valve& Valve::restore() {
 
-	_print( "re-store", _stored );
+	//_print( "re-store", _stored );
+
 	return active( _stored );
 }
 
 Valve& Valve::mute( bool on ) {
 
-	_print( "M", on );
+	//_print( "M", on );
 
 	_mute = true;
 	_turn( on );
@@ -126,7 +127,7 @@ Valve& Valve::mute( bool on ) {
 }
 Valve& Valve::unmute() {
 
-	_print( "*m*", _active );
+	//_print( "*m*", _active );
 
 	if( !_mute ) return *this;
 
@@ -330,13 +331,6 @@ void Transducer::loop() {
  * T I M E D  P R O F E S S O R
  */
 
-#define _SEC(n) ((n)*1000)
-#define _MS(n) (n)
-
-#define _TP_FIRST_WARNING _SEC( 2 )
-#define _TP_SECOND_WARNING _SEC( 1 )
-#define _TP_WARNING _MS( 100 )
-
 TimedProfessor::TimedProfessor(
 		knob_time_t holdTime ) 
 		: _holdTime( holdTime )
@@ -347,7 +341,7 @@ TimedProfessor::TimedProfessor(
 
 void TimedProfessor::start() {
 
-	Serial.println( "*T/start*" );
+	//Serial.println( "*T/start*" );
 
 	_startTime = millis();
 	_running = true;
@@ -355,7 +349,7 @@ void TimedProfessor::start() {
 
 void TimedProfessor::stop() {
 
-	Serial.println( "*T/stop*" );
+	//Serial.println( "*T/stop*" );
 
 	_running = false;
 }
@@ -369,10 +363,8 @@ void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 	register knob_time_t end = _startTime + _holdTime;
 
 	if( _TIME( 0 ) ){
-		Serial.print( "*T/end*" );
-		owner.store();
-		owner.active( false );
-		stop();
+		//Serial.print( "*T/end*" );
+		owner.active( false ); // stops becuase of callback
 	} else if( _TIME( _TP_SECOND_WARNING - _TP_WARNING ) ){
 		if( owner.muted() ){
 			owner.unmute();
@@ -394,11 +386,13 @@ void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 
 bool TimedProfessor::onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal ) {
 
+	/*
 	Serial.print( "*T/onChange: " );
 	Serial.print( oldVal );
 	Serial.print( "->" );
 	Serial.print( newVal );
 	Serial.println( "*" );
+	*/
 
 	if( ! oldVal && newVal ) start();
 	if( oldVal && !newVal ) stop();

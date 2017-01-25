@@ -15,6 +15,10 @@
 	#define KNOBS_TRANSDUCER_CANISTER_SIZE 20
 #endif
 
+#define _TP_FIRST_WARNING _SEC( 2 )
+#define _TP_SECOND_WARNING _SEC( 1 )
+#define _TP_WARNING _MS( 100 )
+
 namespace Knobs {
 
 	enum ValveState {
@@ -23,23 +27,6 @@ namespace Knobs {
 
 	class Transducer;
 	class Professor;
-
-	/*
-	class Switchable {
-		virtual Switchable& active( bool on ) = 0;
-		virtual bool active() = 0;
-		virtual Switchable& on() = 0;
-		virtual Switchable& off() = 0;
-		virtual bool toggle() = 0;
-	};
-	*/
-
-	/*
-	class Fireman {
-		virtual void loop
-	}
-	*/
-
 
 	class Valve {
 
@@ -155,16 +142,15 @@ namespace Knobs {
 			virtual bool onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal );
 	};
 
+	#define _SEC(n) ((n)*1000)
+	#define _MS(n) (n)
+
 	class TimedProfessor : public Professor {
 
 		private:
 			const knob_time_t _holdTime;
 			knob_time_t _startTime;
 			knob_time_t _running;
-
-		protected:
-
-			//inline bool _ist( knob_time_t now, knob_time_t back, knob_time_t delta );
 
 		public:
 			TimedProfessor( knob_time_t holdTime );
