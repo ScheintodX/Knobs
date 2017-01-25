@@ -14,7 +14,7 @@ Valve::Valve( const char * const name, pin_t pin ) : _name( name ), _pin( pin ) 
 	_invert = false;
 	_stored = false;
 	_inputWhenOff = false;
-	_isInit = false;
+	_mute = false;
 }
 
 Valve& Valve::begin(){
@@ -29,8 +29,6 @@ void Valve::_init() {
 	} else {
 		pinMode( _pin, OUTPUT );
 	}
-
-	_isInit = true;
 }
 
 void Valve::_pinMode( bool to ) {
@@ -56,20 +54,31 @@ Valve& Valve::enslave( Valve &slave ) {
 	_slave = &slave;
 	return *this;
 }
+Valve& Valve::handover( Professor &owner ){
+	_owner = &owner;
+	return *this;
+}
 
-Valve& Valve::active( bool on ) {
+void Valve::_turn( bool on ) {
 
 	bool to = _modify( on );
 
-	_active = on;
-
 	if( _inputWhenOff ) _pinMode( to );
-
-	//_print( "turn", to );
 
 	digitalWrite( _pin, to );
 
 	if( _slave ) _slave->active( on );
+}
+
+Valve& Valve::active( bool on ) {
+
+	if( _mute ) return *this;
+
+	if( _owner ) on = _owner->onChange( *this, _active, on );
+
+	_active = on;
+
+	_turn( on );
 
 	return *this;
 }
@@ -94,22 +103,57 @@ Valve& Valve::toggle() {
 
 
 Valve& Valve::store() {
+
+	_print( "store", _active );
+
 	_stored = _active;
 	return *this;
 }
 Valve& Valve::restore() {
-	_active = _stored;
-	return active( _active );
+
+	_print( "re-store", _stored );
+	return active( _stored );
 }
 
+Valve& Valve::mute( bool on ) {
+
+	_print( "M", on );
+
+	_mute = true;
+	_turn( on );
+	
+	return *this;
+}
+Valve& Valve::unmute() {
+
+	_print( "*m*", _active );
+
+	if( !_mute ) return *this;
+
+	_mute = false;
+	_turn( _active );
+	
+	return *this;
+}
+
+bool Valve::muted() {
+	return _mute;
+}
+
+
 pin_t Valve::pin() {
+
 	return _pin;
 }
 const char * Valve::name() {
+
 	return _name;
 }
 
-void Valve::loop( knob_time_t time ) {}
+void Valve::loop( knob_time_t time ) {
+
+	if( _owner ) _owner->onLoop( *this, time );
+}
 
 Valve& Valve::_print( const char *msg, bool val ) {
 
@@ -125,51 +169,6 @@ Valve& Valve::_print( const char *msg, bool val ) {
 
 	return *this;
 }
-
-/*
- * T I M E D  V A L V E
- */
-
-TimedValve::TimedValve( const char * const name, Valve &nested,
-		knob_time_t holdTime, knob_time_t notifyTime ) 
-		: Valve( name, 0 )
-		, _nested( nested )
-		, _holdTime( holdTime )
-		, _notifyTime( notifyTime )
-		{
-		
-	_active = false;
-}
-
-void TimedValve::_start() {
-
-	knob_time_t now = millis();
-
-	_holdUntil = now + _holdTime;
-	_notifyAt = now + _notifyTime;
-	_active = true;
-}
-
-void TimedValve::loop( knob_time_t time ) {
-
-	if( !_active ) return;
-
-}
-
-TimedValve& TimedValve::keep() {
-
-	_active = false;
-
-	return *this;
-}
-
-Valve& TimedValve::active( bool on ) {
-
-	_nested.active( on );
-
-	return *this;
-}
-
 
 /*
  * T R A N S D U C E R
@@ -236,29 +235,43 @@ Transducer& Transducer::begin() {
 	TONALL( begin );
 	return *this;
 }
-inline Transducer& Transducer::active( bool on ) {
 
+inline Transducer& Transducer::active( bool on ) {
 	TONALLP( active, on );
 	return *this;
 }
+
 Transducer& Transducer::on() {
 	return active( ON );
 }
+
 Transducer& Transducer::off() {
 	return active( OFF );
 }
+
 Transducer& Transducer::toggle() {
 	TONALL( toggle );
 	return *this;
 }
+
 Transducer& Transducer::store() {
 	TONALL( store );
 	return *this;
 }
+
 Transducer& Transducer::restore() {
 	TONALL( restore );
 	return *this;
 }
+Transducer& Transducer::mute( bool on ){
+	TONALLP( mute, on );
+	return *this;
+}
+Transducer& Transducer::unmute(){
+	TONALL( unmute );
+	return *this;
+}
+
 Transducer& Transducer::print() {
 
 	Serial.print( "| " );
@@ -311,4 +324,104 @@ void Transducer::loop() {
 		valve->loop( now );
 	}
 }
+
+
+/*
+ * T I M E D  P R O F E S S O R
+ */
+
+#define _SEC(n) ((n)*1000)
+#define _MS(n) (n)
+
+#define _TP_FIRST_WARNING _SEC( 2 )
+#define _TP_SECOND_WARNING _SEC( 1 )
+#define _TP_WARNING _MS( 100 )
+
+TimedProfessor::TimedProfessor(
+		knob_time_t holdTime ) 
+		: _holdTime( holdTime )
+		{
+		
+	_running = false;
+}
+
+void TimedProfessor::start() {
+
+	Serial.println( "*T/start*" );
+
+	_startTime = millis();
+	_running = true;
+}
+
+void TimedProfessor::stop() {
+
+	Serial.println( "*T/stop*" );
+
+	_running = false;
+}
+
+#define _TIME( val ) (time > end - (val))
+
+void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
+
+	if( !_running ) return;
+
+	register knob_time_t end = _startTime + _holdTime;
+
+	if( _TIME( 0 ) ){
+		Serial.print( "*T/end*" );
+		owner.store();
+		owner.active( false );
+		stop();
+	} else if( _TIME( _TP_SECOND_WARNING - _TP_WARNING ) ){
+		if( owner.muted() ){
+			owner.unmute();
+		}
+	} else if( _TIME( _TP_SECOND_WARNING ) ) {
+		if( !owner.muted() ){
+			owner.mute( false );
+		}
+	} else if( _TIME( _TP_FIRST_WARNING - _TP_WARNING ) ){
+		if( owner.muted() ){
+			owner.unmute();
+		}
+	} else if( _TIME( _TP_FIRST_WARNING ) ) {
+		if( !owner.muted() ){
+			owner.mute( false );
+		}
+	}
+}
+
+bool TimedProfessor::onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal ) {
+
+	Serial.print( "*T/onChange: " );
+	Serial.print( oldVal );
+	Serial.print( "->" );
+	Serial.print( newVal );
+	Serial.println( "*" );
+
+	if( ! oldVal && newVal ) start();
+	if( oldVal && !newVal ) stop();
+
+	return newVal;
+}
+
+TimedValve::TimedValve( const char * const name, pin_t pin,
+		knob_time_t holdTime )
+		: Valve( name, pin )
+		, _timer( holdTime )
+		{
+
+	handover( _timer );
+}
+
+void TimedValve::keep() {
+
+	_timer.stop();
+
+	mute( false );
+	delay( _TP_WARNING );
+	unmute();
+}
+
 #pragma GCC diagnostic pop

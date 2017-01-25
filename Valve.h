@@ -22,6 +22,7 @@ namespace Knobs {
 	};
 
 	class Transducer;
+	class Professor;
 
 	/*
 	class Switchable {
@@ -43,23 +44,25 @@ namespace Knobs {
 	class Valve {
 
 		friend class Transducer;
-		friend class Fireman;
+		friend class Professor;
 
 		private:
 			const char * _name;
 
 			const pin_t _pin;
-			bool _active;
-			bool _stored;
 
-			bool _invert;
-			bool _inputWhenOff;
+			bool _invert : 1;
+			bool _inputWhenOff : 1;
 
-			bool _isInit;
+			bool _active : 1;
+			bool _stored : 1;
+			bool _mute : 1;
 
 			Valve *_slave;
+			Professor *_owner;
 
 			void _init();
+			void _turn( bool on );
 			void _pinMode( bool to );
 
 			virtual bool _modify( bool on );
@@ -75,6 +78,7 @@ namespace Knobs {
 			Valve &inputWhenOff( bool on );
 
 			Valve &enslave( Valve &slave );
+			Valve& handover( Professor &owner );
 
 			virtual Valve& active( bool on );
 
@@ -86,43 +90,21 @@ namespace Knobs {
 			Valve& store();
 			Valve& restore();
 
+			Valve& mute( bool on );
+			Valve& unmute();
+			bool muted();
+
 			pin_t pin();
 			const char * name();
 
 			virtual void loop( knob_time_t time );
 	};
 
-
-	class TimedValve : public Valve {
-
-		private:
-			Valve &_nested;
-			const knob_time_t _holdTime;
-			const knob_time_t _notifyTime;
-			knob_time_t _holdUntil;
-			knob_time_t _notifyAt;
-			knob_time_t _active;
-
-		protected:
-
-			void _start();
-
-		public:
-			TimedValve( const char * const name, Valve &nested,
-					knob_time_t holdTime, knob_time_t notifyTime );
-
-			virtual Valve& active( bool on );
-
-			TimedValve& keep();
-
-			virtual void loop( knob_time_t time );
-	};
-
-
 	class Transducer {
 
 		private:
 			const char *_name;
+
 			Canister<Valve, KNOBS_TRANSDUCER_CANISTER_SIZE> _valves;
 
 		public:
@@ -155,12 +137,60 @@ namespace Knobs {
 			Transducer& store();
 			Transducer& restore();
 
+			Transducer& mute( bool on );
+			Transducer& unmute();
+
+
 			Transducer& print();
 
 			const char * name();
 
 			void loop();
 	};
+
+	class Professor {
+
+		public:
+			virtual void onLoop( Valve &owner, knob_time_t time );
+			virtual bool onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal );
+	};
+
+	class TimedProfessor : public Professor {
+
+		private:
+			const knob_time_t _holdTime;
+			knob_time_t _startTime;
+			knob_time_t _running;
+
+		protected:
+
+			//inline bool _ist( knob_time_t now, knob_time_t back, knob_time_t delta );
+
+		public:
+			TimedProfessor( knob_time_t holdTime );
+
+			void start();
+			void stop();
+
+		public:
+			virtual void onLoop( Valve &owner, knob_time_t time );
+			virtual bool onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal );
+	};
+
+	class TimedValve : public Valve {
+
+		friend class TimedProfessor;
+
+		private:
+			TimedProfessor _timer;
+
+		public:
+			TimedValve( const char * const name, pin_t pin,
+					knob_time_t holdTime );
+
+			void keep();
+	};
+
 
 }
 
