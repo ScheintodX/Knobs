@@ -15,8 +15,11 @@
 	#define KNOBS_TRANSDUCER_CANISTER_SIZE 20
 #endif
 
-#define _TP_FIRST_WARNING _SEC( 2 )
-#define _TP_SECOND_WARNING _SEC( 1 )
+#define _SEC(n) ((n)*1000)
+#define _MS(n) (n)
+
+#define _TP_FIRST_WARNING _SEC( 10 )
+#define _TP_SECOND_WARNING _SEC( 3 )
 #define _TP_WARNING _MS( 100 )
 
 namespace Knobs {
@@ -25,8 +28,12 @@ namespace Knobs {
 		OFF=false, ON=true
 	};
 
+	class Valve;
 	class Transducer;
 	class Professor;
+	class Buttler;
+
+	typedef void (*transducer_callback_t)( Transducer &t, Valve &valve );
 
 	class Valve {
 
@@ -44,9 +51,11 @@ namespace Knobs {
 			bool _active : 1;
 			bool _stored : 1;
 			bool _mute : 1;
+			bool _locked : 1;
 
 			Valve *_slave;
 			Professor *_owner;
+			Buttler *_listener;
 
 			void _init();
 			void _turn( bool on );
@@ -67,7 +76,9 @@ namespace Knobs {
 			Valve &enslave( Valve &slave );
 			Valve& handover( Professor &owner );
 
-			virtual Valve& active( bool on );
+			Valve& direct( Buttler &listener );
+
+			virtual Valve& active( bool on, bool silent=false );
 
 			bool active();
 			Valve& on();
@@ -80,6 +91,10 @@ namespace Knobs {
 			Valve& mute( bool on );
 			Valve& unmute();
 			bool muted();
+
+			Valve& lock();
+			Valve& unlock();
+			bool locked();
 
 			pin_t pin();
 			const char * name();
@@ -118,6 +133,8 @@ namespace Knobs {
 			Transducer& off();
 			Transducer& toggle();
 
+			Transducer& each( transducer_callback_t cb );
+
 			Transducer& activeMask( uint32_t mask );
 			uint32_t activeMask();
 
@@ -126,7 +143,6 @@ namespace Knobs {
 
 			Transducer& mute( bool on );
 			Transducer& unmute();
-
 
 			Transducer& print();
 
@@ -138,12 +154,16 @@ namespace Knobs {
 	class Professor {
 
 		public:
-			virtual void onLoop( Valve &owner, knob_time_t time );
-			virtual bool onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal );
+			virtual void onLoop( Valve &valve, knob_time_t time ) = 0;
+			virtual bool onChange( Valve &valve, knob_value_t oldVal, knob_value_t newVal ) = 0;
 	};
 
-	#define _SEC(n) ((n)*1000)
-	#define _MS(n) (n)
+	class Buttler {
+
+		public:
+			virtual void onChange( Valve &valve, knob_value_t oldVal, knob_value_t newVal ) = 0;
+
+	};
 
 	class TimedProfessor : public Professor {
 
@@ -152,11 +172,16 @@ namespace Knobs {
 			knob_time_t _startTime;
 			knob_time_t _running;
 
+			knob_time_t _firstWarning;
+			knob_time_t _secondWarning;
+
 		public:
 			TimedProfessor( knob_time_t holdTime );
+			TimedProfessor( knob_time_t holdTime, knob_time_t firstWarning, knob_time_t secondWarning );
 
 			void start();
 			void stop();
+			void reset();
 
 		public:
 			virtual void onLoop( Valve &owner, knob_time_t time );
@@ -173,8 +198,12 @@ namespace Knobs {
 		public:
 			TimedValve( const char * const name, pin_t pin,
 					knob_time_t holdTime );
+			TimedValve( const char * const name, pin_t pin,
+					knob_time_t holdTime, knob_time_t firstWarning, knob_time_t secondWarning );
 
 			void keep();
+
+			TimedProfessor &timer();
 	};
 
 

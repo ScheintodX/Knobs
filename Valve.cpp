@@ -15,9 +15,10 @@ Valve::Valve( const char * const name, pin_t pin ) : _name( name ), _pin( pin ) 
 	_stored = false;
 	_inputWhenOff = false;
 	_mute = false;
+	_locked = false;
 }
 
-Valve& Valve::begin(){
+Valve& Valve::begin() {
 	_init();
 	return *this;
 }
@@ -54,8 +55,12 @@ Valve& Valve::enslave( Valve &slave ) {
 	_slave = &slave;
 	return *this;
 }
-Valve& Valve::handover( Professor &owner ){
+Valve& Valve::handover( Professor &owner ) {
 	_owner = &owner;
+	return *this;
+}
+Valve& Valve::direct( Buttler &listener ) {
+	_listener = &listener;
 	return *this;
 }
 
@@ -70,11 +75,13 @@ void Valve::_turn( bool on ) {
 	if( _slave ) _slave->active( on );
 }
 
-Valve& Valve::active( bool on ) {
+Valve& Valve::active( bool on, bool silent ) {
 
 	if( _mute ) return *this;
+	if( _locked ) return *this;
 
 	if( _owner ) on = _owner->onChange( *this, _active, on );
+	if( _listener && !silent ) _listener->onChange( *this, _active, on );
 
 	_active = on;
 
@@ -139,6 +146,18 @@ Valve& Valve::unmute() {
 
 bool Valve::muted() {
 	return _mute;
+}
+
+Valve& Valve::lock() {
+	_locked = true;
+	return *this;
+}
+Valve& Valve::unlock() {
+	_locked = false;
+	return *this;
+}
+bool Valve::locked() {
+	return _locked;
 }
 
 
@@ -272,6 +291,15 @@ Transducer& Transducer::unmute(){
 	TONALL( unmute );
 	return *this;
 }
+Transducer& Transducer::each( transducer_callback_t cb ) {
+
+	Valve *valve; \
+	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+
+		cb( *this, *valve );
+	}
+	return *this;
+}
 
 Transducer& Transducer::print() {
 
@@ -297,6 +325,7 @@ Transducer& Transducer::activeMask( uint32_t mask ) {
 	}
 	return *this;
 }
+
 uint32_t Transducer::activeMask() {
 
 	uint32_t mask = 0;
@@ -331,9 +360,20 @@ void Transducer::loop() {
  * T I M E D  P R O F E S S O R
  */
 
-TimedProfessor::TimedProfessor(
-		knob_time_t holdTime ) 
+TimedProfessor::TimedProfessor( knob_time_t holdTime ) 
 		: _holdTime( holdTime )
+		, _firstWarning( _TP_FIRST_WARNING )
+		, _secondWarning( _TP_SECOND_WARNING )
+		{
+		
+	_running = false;
+}
+
+TimedProfessor::TimedProfessor( knob_time_t holdTime, 
+		knob_time_t firstWarning, knob_time_t secondWarning ) 
+		: _holdTime( holdTime )
+		, _firstWarning( firstWarning )
+		, _secondWarning( secondWarning )
 		{
 		
 	_running = false;
@@ -354,7 +394,12 @@ void TimedProfessor::stop() {
 	_running = false;
 }
 
-#define _TIME( val ) (time > end - (val))
+void TimedProfessor::reset() {
+
+	if( _running ) start();
+}
+
+#define _TIME( val ) ( time > end - (val) )
 
 void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 
@@ -363,21 +408,20 @@ void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 	register knob_time_t end = _startTime + _holdTime;
 
 	if( _TIME( 0 ) ){
-		//Serial.print( "*T/end*" );
 		owner.active( false ); // stops becuase of callback
-	} else if( _TIME( _TP_SECOND_WARNING - _TP_WARNING ) ){
-		if( owner.muted() ){
+	} else if( _secondWarning && _TIME( _secondWarning - _TP_WARNING ) ){
+		if( owner.muted() ) {
 			owner.unmute();
 		}
-	} else if( _TIME( _TP_SECOND_WARNING ) ) {
+	} else if( _secondWarning && _TIME( _secondWarning ) ) {
 		if( !owner.muted() ){
 			owner.mute( false );
 		}
-	} else if( _TIME( _TP_FIRST_WARNING - _TP_WARNING ) ){
+	} else if( _firstWarning && _TIME( _firstWarning - _TP_WARNING ) ){
 		if( owner.muted() ){
 			owner.unmute();
 		}
-	} else if( _TIME( _TP_FIRST_WARNING ) ) {
+	} else if( _firstWarning && _TIME( _firstWarning ) ) {
 		if( !owner.muted() ){
 			owner.mute( false );
 		}
@@ -408,6 +452,14 @@ TimedValve::TimedValve( const char * const name, pin_t pin,
 
 	handover( _timer );
 }
+TimedValve::TimedValve( const char * const name, pin_t pin,
+		knob_time_t holdTime, knob_time_t firstWarning, knob_time_t secondWarning )
+		: Valve( name, pin )
+		, _timer( holdTime, firstWarning, secondWarning )
+		{
+
+	handover( _timer );
+}
 
 void TimedValve::keep() {
 
@@ -416,6 +468,10 @@ void TimedValve::keep() {
 	mute( false );
 	delay( _TP_WARNING );
 	unmute();
+}
+
+TimedProfessor& TimedValve::timer() {
+	return _timer;
 }
 
 #pragma GCC diagnostic pop
