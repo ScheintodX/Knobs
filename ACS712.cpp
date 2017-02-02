@@ -28,10 +28,21 @@ ACS712::ACS712( const char *name, pin_t pin, ACS_VERSION version,
 
 void ACS712::loop(){
 
+	//static int i;
+
 	knob_value_t in, val;
 	float div;
 
 	in = _read();
+
+	/*
+	i++;
+	if( i%100 == 0 ){
+		Serial.print( "[" );
+		Serial.print( in );
+		Serial.println( "]" );
+	}
+	*/
 
 	_count++;
 
