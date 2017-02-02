@@ -136,21 +136,21 @@ namespace Knobs {
 
 	class Click : public Handler {
 
-		static const knob_time_t MAX_TIME_CLICK = 250;
+		static const knob_time_t MAX_TIME_CLICK = 0;
 
 		private:
 			const knob_time_t _maxTimeClick;
 			knob_time_t _timeStart;
 
 		protected:
-			Click( HandlerType type, callback_t callback, knob_time_t maxTime );
-			Click( HandlerType type, minimal_callback_t callback, knob_time_t maxTime );
+			Click( HandlerType type, callback_t callback,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK );
+			Click( HandlerType type, minimal_callback_t callback,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK );
 
 		public:
-			Click( callback_t callback );
-			Click( callback_t callback, knob_time_t maxTime );
-			Click( minimal_callback_t callback );
-			Click( minimal_callback_t callback, knob_time_t maxTime );
+			Click( callback_t callback, knob_time_t maxTime = MAX_TIME_CLICK );
+			Click( minimal_callback_t callback, knob_time_t maxTime = MAX_TIME_CLICK );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -161,7 +161,7 @@ namespace Knobs {
 
 		private:
 
-			static const knob_time_t MAX_TIME_CLICK = 250;
+			static const knob_time_t MAX_TIME_CLICK = 0;
 			static const knob_time_t MAX_TIME_INBETWEEN = 750;
 
 			const knob_time_t _maxTimeInbetween;
@@ -172,15 +172,20 @@ namespace Knobs {
 
 		protected:
 
-			virtual bool _callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count );
+			virtual bool _callback( Device &dev,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
 		public:
-			DoubleClick( callback_t callback );
-			DoubleClick( callback_t callback, knob_value_t maxClicks );
-			DoubleClick( callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
-			DoubleClick( minimal_callback_t callback );
-			DoubleClick( minimal_callback_t callback, knob_value_t maxClicks );
-			DoubleClick( minimal_callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
+			DoubleClick( callback_t callback,
+					knob_value_t maxClicks = 2,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK,
+					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
+			);
+			DoubleClick( minimal_callback_t callback,
+					knob_value_t maxClicks = 2,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK,
+					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
+			);
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -204,10 +209,14 @@ namespace Knobs {
 			virtual bool _callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
 		public:
-			MultiClick( callback_t callback );
-			MultiClick( callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
-			MultiClick( minimal_callback_t callback );
-			MultiClick( minimal_callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween );
+			MultiClick( callback_t callback,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK,
+					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
+			);
+			MultiClick( minimal_callback_t callback,
+					knob_time_t maxTimeClick = MAX_TIME_CLICK,
+					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
+			);
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -268,8 +277,10 @@ namespace Knobs {
 			const knob_value_t _lower_bound;
 
 		public:
-			Hysteresis( callback_t callback, knob_value_t lower_bound, knob_value_t upper_bound );
-			Hysteresis( minimal_callback_t callback, knob_value_t lower_bound, knob_value_t upper_bound );
+			Hysteresis( callback_t callback,
+					knob_value_t lower_bound, knob_value_t upper_bound );
+			Hysteresis( minimal_callback_t callback,
+					knob_value_t lower_bound, knob_value_t upper_bound );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -295,13 +306,20 @@ namespace Knobs {
 			const char *_name;
 			Canister<Handler,KNOBS_HANDLER_CANISTER_SIZE> _handlers;
 
+			Device *_slave;
+
 		protected:
-			void _activate( knob_value_t newState, knob_value_t oldState, knob_time_t count );
+			void _activate( knob_value_t newState,
+					knob_value_t oldState, knob_time_t count );
 			Device( const char *name );
+			bool _mute;
 
 		public:
+			Device& enslave( Device &slave );
+			Device& mute( bool mute );
 			virtual void loop() = 0;
 			Device& on( Handler &handler );
+			const char *name();
 
 			#define ON( WHAT ) \
 					inline Device& on ## WHAT( minimal_callback_t cb ) { \
@@ -370,11 +388,12 @@ namespace Knobs {
 			knob_time_t _timeDebounce;
 			knob_time_t _countDebounce;
 
+
 		public:
 
 			Knob( const char *name, pin_t pin );
 
-			Knob & debounce( knob_time_t time );
+			Knob& debounce( knob_time_t time );
 
 			knob_value_t value();
 
@@ -418,7 +437,6 @@ namespace Knobs {
 			Panel( const char *name, Device &k1 );
 			Panel( const char *name, Device &k1, Device &k2 );
 			Panel( const char *name, Device &k1, Device &k2, Device &k3 );
-			//Panel( Device &k1, Device &k2, Device &k3, Device... rest );
 			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4 );
 			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
 					Device &k5 );

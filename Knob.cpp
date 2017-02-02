@@ -23,11 +23,25 @@ static inline knob_time_t MAX( knob_time_t v1, knob_time_t v2 ) {
 
 Device::Device( const char *name ) : _name( name ){}
 
+Device& Device::enslave( Device &slave ){
+	slave.mute( true );
+	_slave = &slave;
+	return *this;
+}
+Device& Device::mute( bool mute ) {
+	_mute = mute;
+	return *this;
+}
+
 Device& Device::on( Handler &handler ){
 
 	_handlers.add( handler );
 
 	return *this;
+}
+
+const char* Device::name() {
+	return _name;
 }
 
 void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
@@ -42,6 +56,8 @@ void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_
 
 		if( !cont ) break;
 	}
+
+	if( _slave ) _slave->_activate( newState, oldState, time );
 }
 
 
@@ -108,6 +124,8 @@ knob_value_t Knob::value() {
 
 void Knob::loop() {
 
+	if( _mute ) return;
+
 	knob_time_t now = millis(),
 	       delta = _lastTime < now ?
 		   		now - _lastTime :
@@ -146,24 +164,6 @@ Knob& Knob::debounce( knob_time_t time ) {
 	_timeDebounce = time;
 	return *this;
 }
-
-/*
-Knobber::Knobber( pin_t pin, Knob &other ) 
-		: Knob( pin )
-		, _other( other ){}
-
-void Knobber::_activate( knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
-	Knob::_activate( newState, oldState, count );
-	_other._activate( newState, oldState, count );
-}
-
-void Knobber::loop() {
-
-	Knob::loop();
-	_other.loop();
-}
-*/
-
 
 
 /*****************************************************************************
@@ -240,33 +240,22 @@ bool Toggle::handle( Device &dev, knob_value_t newState, knob_value_t oldState, 
 
 // == Click ==
 
-Click::Click( HandlerType type, callback_t callback, knob_time_t maxTime )
+Click::Click( HandlerType type, callback_t callback, knob_time_t maxTimeClick )
 		: Handler( type, callback )
-		, _maxTimeClick( maxTime )
+		, _maxTimeClick( maxTimeClick )
 		{}
-Click::Click( HandlerType type, minimal_callback_t callback, knob_time_t maxTime )
+Click::Click( HandlerType type, minimal_callback_t callback, knob_time_t maxTimeClick )
 		: Handler( type, callback )
-		, _maxTimeClick( maxTime )
+		, _maxTimeClick( maxTimeClick )
 		{}
 
-Click::Click( callback_t callback )
+Click::Click( callback_t callback, knob_time_t maxTimeClick )
 		: Handler( HT_CLICK, callback )
-		, _maxTimeClick( MAX_TIME_CLICK )
+		, _maxTimeClick( maxTimeClick )
 		{}
-
-Click::Click( callback_t callback, knob_time_t maxTime )
+Click::Click( minimal_callback_t callback, knob_time_t maxTimeClick )
 		: Handler( HT_CLICK, callback )
-		, _maxTimeClick( maxTime )
-		{}
-
-Click::Click( minimal_callback_t callback )
-		: Handler( HT_CLICK, callback )
-		, _maxTimeClick( MAX_TIME_CLICK )
-		{}
-
-Click::Click( minimal_callback_t callback, knob_time_t maxTime )
-		: Handler( HT_CLICK, callback )
-		, _maxTimeClick( maxTime )
+		, _maxTimeClick( maxTimeClick )
 		{}
 
 bool Click::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
@@ -283,7 +272,7 @@ bool Click::handle( Device &dev, knob_value_t newState, knob_value_t oldState, k
 		// release
 		} else {
 
-			if( now-_timeStart < _maxTimeClick )
+			if( !_maxTimeClick || now-_timeStart < _maxTimeClick )
 					return _callback( dev, newState, oldState, time );
 
 		}
@@ -294,27 +283,8 @@ bool Click::handle( Device &dev, knob_value_t newState, knob_value_t oldState, k
 
 // == DoubleClick ==
 
-DoubleClick::DoubleClick( callback_t callback )
-		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
-		, _maxClicks( 2 )
-		{
-	
-	_clicks = 0;
-	_timeStartSequence = 0;
-}
-
-DoubleClick::DoubleClick( callback_t callback, knob_value_t maxClicks )
-		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
-		, _maxClicks( 2 )
-		{
-	
-	_clicks = 0;
-	_timeStartSequence = 0;
-}
-
-DoubleClick::DoubleClick( callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
+DoubleClick::DoubleClick( callback_t callback,
+		knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
 		: Click( HT_DOUBLECLICK, callback, maxTimeClick )
 		, _maxTimeInbetween( maxTimeInbetween )
 		, _maxClicks( maxClicks )
@@ -324,27 +294,8 @@ DoubleClick::DoubleClick( callback_t callback, knob_value_t maxClicks, knob_time
 	_timeStartSequence = 0;
 }
 
-DoubleClick::DoubleClick( minimal_callback_t callback )
-		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
-		, _maxClicks( 2 )
-		{
-	
-	_clicks = 0;
-	_timeStartSequence = 0;
-}
-
-DoubleClick::DoubleClick( minimal_callback_t callback, knob_value_t maxClicks )
-		: Click( HT_DOUBLECLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
-		, _maxClicks( 2 )
-		{
-	
-	_clicks = 0;
-	_timeStartSequence = 0;
-}
-
-DoubleClick::DoubleClick( minimal_callback_t callback, knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
+DoubleClick::DoubleClick( minimal_callback_t callback,
+		knob_value_t maxClicks, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
 		: Click( HT_DOUBLECLICK, callback, maxTimeClick )
 		, _maxTimeInbetween( maxTimeInbetween )
 		, _maxClicks( maxClicks )
@@ -394,27 +345,9 @@ bool DoubleClick::handle( Device &dev, knob_value_t newState, knob_value_t oldSt
 
 // == MultiClick ==
 
-MultiClick::MultiClick( callback_t callback )
-		: Click( HT_MULTICLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
-		{
-	
-	_clicks = 0;
-	_timeLastClick = 0;
-}
-
 MultiClick::MultiClick( callback_t callback, knob_time_t maxTimeClick, knob_time_t maxTimeInbetween )
 		: Click( HT_MULTICLICK, callback, maxTimeClick )
 		, _maxTimeInbetween( maxTimeInbetween )
-		{
-	
-	_clicks = 0;
-	_timeLastClick = 0;
-}
-
-MultiClick::MultiClick( minimal_callback_t callback )
-		: Click( HT_MULTICLICK, callback, MAX_TIME_CLICK )
-		, _maxTimeInbetween( MAX_TIME_INBETWEEN )
 		{
 	
 	_clicks = 0;
@@ -476,15 +409,24 @@ Hold::Hold( minimal_callback_t callback, knob_time_t time )
 
 bool Hold::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
+	//Serial.print( "." );
+	//Serial.print( dev.name() );
+	//Serial.print( "-" );
+	//Serial.print( newState );
+
 	if( newState && time >= _timeHold && ( !_hasSent || _continues ) ) {
 
+		//Serial.print( "=" );
 		_hasSent = true;
 
 		return _callback( dev, newState, oldState, time );
 	} 
 	if( !newState ) {
 
-		_hasSent = false;
+		if( _hasSent ) {
+			_hasSent = false;
+			return false; // keep click from been called (if click is *after* this)
+		}
 	}
 
 	return true;
