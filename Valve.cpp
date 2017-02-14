@@ -90,23 +90,11 @@ Valve& Valve::active( bool on, bool silent ) {
 	return *this;
 }
 
-Valve& Valve::on() {
-	return active( true );
-}
-Valve& Valve::off() {
-	return active( false );
-}
-
 bool Valve::active() {
 
 	return _active;
 }
 
-Valve& Valve::toggle() {
-
-	active( !_active );
-	return *this;
-}
 
 
 Valve& Valve::store() {
@@ -129,7 +117,7 @@ Valve& Valve::mute( bool on ) {
 
 	_mute = true;
 	_turn( on );
-	
+
 	return *this;
 }
 Valve& Valve::unmute() {
@@ -140,7 +128,7 @@ Valve& Valve::unmute() {
 
 	_mute = false;
 	_turn( _active );
-	
+
 	return *this;
 }
 
@@ -159,7 +147,6 @@ Valve& Valve::unlock() {
 bool Valve::locked() {
 	return _locked;
 }
-
 
 pin_t Valve::pin() {
 
@@ -291,21 +278,50 @@ Transducer& Transducer::unmute(){
 	TONALL( unmute );
 	return *this;
 }
-Transducer& Transducer::each( transducer_callback_t cb ) {
+Transducer& Transducer::each( transducer_callback_t cb, knob_value_t val ) {
 
 	Valve *valve; \
-	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
 
-		cb( *this, *valve );
+		cb( *this, *valve, val );
 	}
 	return *this;
+}
+/*
+Transducer& Transducer::active( const char *prefix, knob_value_t val ) {
+
+	unsigned int len = strlen( prefix );
+
+	Valve *valve; \
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
+
+		if( strncmp( name(), prefix, len ) ) valve->active( val );
+	}
+	return *this;
+}
+*/
+Valve* Transducer::find( const char *prefix ){
+
+	Valve *valve; \
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
+
+		const char *name = valve->name();
+		unsigned int len = strlen( name );
+
+		if( strncmp( name, prefix, len ) == 0 ) return valve;
+	}
+	return NULL;
+}
+
+int Transducer::fill() {
+	return _valves.fill();
 }
 
 Transducer& Transducer::print() {
 
 	Serial.print( "| " );
 	Valve *valve; \
-	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
 		Serial.print( valve->active() ? "X" : "o" );
 		Serial.print( " " );
 	}
@@ -318,7 +334,7 @@ Transducer& Transducer::activeMask( uint32_t mask ) {
 	Valve *valve;
 	int count = 1;
 
-	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
 
 		valve->active( mask & count );
 		count = count<<1;
@@ -332,12 +348,39 @@ uint32_t Transducer::activeMask() {
 	int count = 1;
 	Valve *valve;
 
-	for( valve=_valves.first(); valve; valve=_valves.next() ) { 
+	for( valve=_valves.first(); valve; valve=_valves.next() ) {
 
 		mask |= valve->active() ? count : 0;
 		count = count<<1;
 	}
 	return mask;
+}
+
+Transducer& Transducer::rotate( t_rotate_f rot ) {
+
+    uint32_t mask = activeMask();
+
+	mask = rot( mask );
+
+    activeMask( mask );
+	store();
+
+    return *this;
+}
+Transducer& Transducer::toggle( t_rotate_f rot ) {
+
+    if( activeMask() ) {
+
+        off();
+
+    } else {
+        restore();
+
+        if( !activeMask() ) {
+            activeMask( rot( 0 ) );
+        }
+    }
+    return *this;
 }
 
 const char * Transducer::name() {
@@ -360,22 +403,22 @@ void Transducer::loop() {
  * T I M E D  P R O F E S S O R
  */
 
-TimedProfessor::TimedProfessor( knob_time_t holdTime ) 
+TimedProfessor::TimedProfessor( knob_time_t holdTime )
 		: _holdTime( holdTime )
 		, _firstWarning( _TP_FIRST_WARNING )
 		, _secondWarning( _TP_SECOND_WARNING )
 		{
-		
+
 	_running = false;
 }
 
-TimedProfessor::TimedProfessor( knob_time_t holdTime, 
-		knob_time_t firstWarning, knob_time_t secondWarning ) 
+TimedProfessor::TimedProfessor( knob_time_t holdTime,
+		knob_time_t firstWarning, knob_time_t secondWarning )
 		: _holdTime( holdTime )
 		, _firstWarning( firstWarning )
 		, _secondWarning( secondWarning )
 		{
-		
+
 	_running = false;
 }
 

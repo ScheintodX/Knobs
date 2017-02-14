@@ -12,8 +12,11 @@ namespace Knobs {
 	class Canister {
 
 		private:
+
 			T *_reservoir[ N ];
+
 			int _fill;
+
 			int _current;
 
 		public:
@@ -48,8 +51,10 @@ namespace Knobs {
 			}
 
 			inline int fill() {
-
 				return _fill;
+			}
+			inline int capacity() {
+				return N;
 			}
 
 	};

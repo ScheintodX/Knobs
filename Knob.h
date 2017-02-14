@@ -11,17 +11,15 @@
 #include "knobs_common.h"
 #include "Canister.h"
 
-#ifndef KNOBS_HANDLER_CANISTER_SIZE 
+#ifndef KNOBS_HANDLER_CANISTER_SIZE
 	#define KNOBS_HANDLER_CANISTER_SIZE 5
 #endif
-#ifndef KNOBS_PANEL_CANISTER_SIZE 
+#ifndef KNOBS_PANEL_CANISTER_SIZE
 	#define KNOBS_PANEL_CANISTER_SIZE 20
 #endif
 
 
-/**
- * Everything is put in namespace Knobs in order to avoid conflicts
- */
+// Everything is put in namespace Knobs in order to avoid conflicts
 namespace Knobs {
 
 	#define KNOB_VAL_MAX INT_MAX
@@ -49,14 +47,14 @@ namespace Knobs {
 		HT_FALL=10,
 		HT_OVER=11,
 		HT_UNDER=12,
-		HT_HYSTERESIS=13
+		HT_HYSTERESIS=13,
+		HT_TRANSPORT=99
 	};
 
 
-	/**
-	 * A handler encapsulates on type of action which is looked for in order to do something.
-	 * Examples are: push, click, hold, etc...
-	 */
+	 // A handler encapsulates on type of action which is looked for in order to do something.
+	 // Examples are: push, click, hold, etc...
+	 // Handlers have one callback which is called then the Handler thinks it should be.
 	class Handler {
 
 		friend class Device;
@@ -76,12 +74,14 @@ namespace Knobs {
 			Handler( HandlerType type, minimal_callback_t callback );
 			Handler( HandlerType type, callback_t callback );
 
+			// called periodically with Knob's state
+			// Override to implement Handlers functionallity
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t count ) = 0;
 
 	};
 
-
+	// Callback every loop
 	class Always : public Handler {
 
 		public:
@@ -94,7 +94,7 @@ namespace Knobs {
 
 	};
 
-
+	// Calls back when state changes off -> on
 	class Push : public Handler {
 
 		public:
@@ -108,7 +108,7 @@ namespace Knobs {
 	};
 	typedef Push Activate;
 
-
+	// Calls back when state changes on -> off
 	class Release : public Handler {
 
 		public:
@@ -122,7 +122,7 @@ namespace Knobs {
 	};
 	typedef Release Deactivate;
 
-
+	// Calls back when state changes in any way
 	class Toggle : public Handler {
 
 		public:
@@ -133,7 +133,24 @@ namespace Knobs {
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
 	};
 
+	// A special handler for implementing communication
+	// Calls back periodically when state is on and a single time when state changes on->off
+	class Transport : public Handler {
 
+		private:
+			knob_time_t _lastTime;
+			const knob_time_t _periode;
+
+		public:
+			Transport( callback_t callback, knob_time_t periode );
+			Transport( minimal_callback_t callback, knob_time_t periode );
+
+			virtual bool handle( Device &dev,
+					knob_value_t newState, knob_value_t oldState, knob_time_t time );
+	};
+
+	// Calls back when state changes off -> on -> off
+	// while the max time of on can be set
 	class Click : public Handler {
 
 		static const knob_time_t MAX_TIME_CLICK = 0;
@@ -156,7 +173,7 @@ namespace Knobs {
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
 	};
 
-
+	// Calls back on double click
 	class DoubleClick : public Click {
 
 		private:
@@ -192,6 +209,7 @@ namespace Knobs {
 
 	};
 
+	// Calls back every click after the first
 	class MultiClick : public Click {
 
 		private:
@@ -223,7 +241,7 @@ namespace Knobs {
 
 	};
 
-
+	// Calls back periodically while state 'on'
 	class Hold : public Handler {
 
 		private:
@@ -244,6 +262,8 @@ namespace Knobs {
 
 	};
 
+	// Calls back while value is bigger than configured one
+	// Analog: yes
 	class Over : public Handler {
 
 		private:
@@ -257,6 +277,8 @@ namespace Knobs {
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
 	};
 
+	// Calls back while value is lesser than configured one
+	// Analog: yes
 	class Under : public Handler {
 
 		private:
@@ -270,6 +292,8 @@ namespace Knobs {
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
 	};
 
+	// Calls back while state is bigger then a configured value
+	// and stops when state is lower then another value
 	class Hysteresis : public Handler {
 
 		private:
@@ -287,17 +311,14 @@ namespace Knobs {
 
 	};
 
-	/**
-	 * A Device is one physical thing which is used to interact. 
-	 * One device can have multiple handlers.
-	 * E.g. one "push button" a.k.a "Knob" device can have handlers for click, push, hold, etc...
-	 * Different devices can have different implementations in hardware. E.g. one push button
-	 * watches one binary pin. One PowerSensor watches one analog pin. But you can have devices
-	 * with multiple pins, too.
-	 * All devices are connected and manage queues of handlers.
-	 * Handlers are added via the "on" method.
-	 */
-
+	// A Device is one physical thing which is used to interact.
+	// One device can have multiple handlers.
+	// E.g. one "push button" a.k.a "Knob" device can have handlers for click, push, hold, etc...
+	// Different devices can have different implementations in hardware. E.g. one push button
+	// watches one binary pin. One PowerSensor watches one analog pin. But you can have devices
+	// with multiple pins, too.
+	// All devices are connected and manage queues of handlers.
+	// Handlers are added via the "on" method.
 	class Device {
 
 		friend class Panel;
@@ -315,14 +336,27 @@ namespace Knobs {
 			bool _mute;
 
 		public:
+			// remote controll other Device
 			Device& enslave( Device &slave );
+
+			// pause operation
 			Device& mute( bool mute );
+
+			// must be called periodically. At best < every 20ms
 			virtual void loop() = 0;
+
+			// add a handler
 			Device& on( Handler &handler );
+
+			// return name
 			const char *name();
 
 			#define ON( WHAT ) \
 					inline Device& on ## WHAT( minimal_callback_t cb ) { \
+						on( *( new WHAT( cb ) ) ); \
+						return *this; \
+					} \
+					inline Device& on ## WHAT( callback_t cb ) { \
 						on( *( new WHAT( cb ) ) ); \
 						return *this; \
 					}
@@ -330,13 +364,24 @@ namespace Knobs {
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE val ) { \
 						on( *( new WHAT( cb, val ) ) ); \
 						return *this; \
+					} \
+					inline Device& on ## WHAT( callback_t cb, TYPE val ) { \
+						on( *( new WHAT( cb, val ) ) ); \
+						return *this; \
 					}
 			#define ONPP( WHAT, TYPE1, TYPE2 ) \
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
 						on( *( new WHAT( cb, val1, val2 ) ) ); \
 						return *this; \
+					} \
+					inline Device& on ## WHAT( callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( *( new WHAT( cb, val1, val2 ) ) ); \
+						return *this; \
 					}
 
+			// add handlers. see there for what they do.
+			// note that these methods must use 'new' to create the handlers
+			// so keep an eye on the heap
 			ON( Always )
 			ON( Push )
 			ON( Release )
@@ -348,11 +393,10 @@ namespace Knobs {
 			ONP( Over, knob_value_t )
 			ONP( Under, knob_value_t )
 			ONPP( Hysteresis, knob_value_t, knob_value_t )
+			ONP( Transport, knob_time_t )
 	};
 
-	/**
-	 * BooleanDevice: One device which watches one digital input pin
-	 */
+	// BooleanDevice: One device which watches one digital input pin
 	class BooleanDevice : public Device {
 
 		protected:
@@ -364,16 +408,17 @@ namespace Knobs {
 		public:
 			BooleanDevice( const char *name, pin_t pin );
 
+			// activate pullup (if hardware supports it)
 			BooleanDevice& pullup( bool on );
+
+			// invert logical pin state
 			BooleanDevice& invert( bool on );
 
 			pin_t pin();
-			
+
 	};
 
-	/**
-	 * Knob: An implementation of an boolean device which is debounced.
-	 */
+	// Knob: An implementation of an boolean device which is debounced.
 	class Knob : public BooleanDevice {
 
 		private:
@@ -398,31 +443,10 @@ namespace Knobs {
 			knob_value_t value();
 
 			virtual void loop();
-			
+
 	};
 
-	/*
-	class Knobber : public Knob {
-
-		private:
-			Knob &_other;
-
-		protected:
-			void _activate( knob_value_t newState, knob_value_t oldState, knob_time_t count );
-
-		public:
-			Knobber( pin_t pin, Knob &other );
-			virtual void loop();
-	};
-	*/
-
-	/**
-	 * Small helper class to get your knobs organized.
-	 *
-	 * If you need to know: The buttons are processed in reversed
-	 * order of how they where added. This keeps code size small
-	 * and we don't have to lookup/store the last added button(last first) 
-	 */
+	// Small helper class to get your knobs organized.
 	class Panel {
 
 		private:
@@ -447,14 +471,16 @@ namespace Knobs {
 			Panel( const char *name, Device &k1, Device &k2, Device &k3, Device &k4,
 					Device &k5, Device &k6, Device &k7, Device &k8 );
 
+			// add another Device
 			Panel& operator <<( Device &device );
 
+			// call periodicalle. At best faster than 20ms
 			void loop();
 
+			// return name
 			const char * name();
 
 	};
-
 }
 
 #pragma GCC diagnostic pop

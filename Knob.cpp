@@ -237,6 +237,33 @@ bool Toggle::handle( Device &dev, knob_value_t newState, knob_value_t oldState, 
 	return true;
 }
 
+// == Transport ==
+// (callback regularily if active, deactove one time)
+
+Transport::Transport( callback_t callback, knob_time_t periode ) 
+		: Handler( HT_TRANSPORT, callback ), _periode( periode ){}
+Transport::Transport( minimal_callback_t callback, knob_time_t periode ) 
+		: Handler( HT_TRANSPORT, callback ), _periode( periode ){}
+
+bool Transport::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
+
+	if( !oldState && newState ) {
+		_lastTime = time;
+		return _callback( dev, newState, oldState, time );
+	}
+
+	if( newState && time - _lastTime > _periode ) {
+		_lastTime = time;
+		return _callback( dev, newState, oldState, time );
+	}
+
+	if( oldState && !newState ) {
+		return _callback( dev, newState, oldState, time );
+	}
+
+	return true;
+}
+
 
 // == Click ==
 
