@@ -11,6 +11,6 @@
 		"url": "https://github.com/ScheintodX/BulliBus.git"
 	},
 	"version": "1.0.0",
-	"platforms": "atmelavr, titiva"
+	"platforms": "atmelavr, titiva",
 	"frameworks": "arduino, energia"
 }
