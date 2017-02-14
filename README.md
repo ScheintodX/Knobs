@@ -1,7 +1,4 @@
-# BulliBus
-
-=== JUST NOT READY, YET! ===
-(but let's call it *beta*)
+# Knobs
 
 Library for easy plug&play use of buttons and switches (and more to come)
 
@@ -32,13 +29,12 @@ EXAMPLE:
 	}
 
     Knob knob( D1 );
-	Click click = Click( onClick );
-	Hold hold = Hold( onHold, 500 );
 
 	void setup() {
 		knob
-			.on( click )
-			.on( hold )
+			.invert( true )
+			.onClick( onClick )
+			.onHold( onHold )
 			;
 	}
 
@@ -47,31 +43,3 @@ EXAMPLE:
 		knob.loop();
 	}
 
-
-ISSUES:
- * Not ready yet
- * Make even more simple to use:
-   * Simplify (somehow?) declaration. Much better would be a style like:
-
-    Knob knob( D1 )
-		.on( Click( onClick ) )
-		.on( Hold( onHold, 500 ) )
-		;
-
-	(Doesn't work because we can't execute code at that place)
-
-	or at least:
-
-	Knob knob( D1 );
-
-	setup {
-
-		knob
-			.on( Click( onClick ) )
-			.on( Hold( onHold, 500 ) )
-			;
-
-		(Doesn't work because we can't allocate Handlers on Stack.)
-	}
-
- * Make doubleclick work in combination with click somehow?
