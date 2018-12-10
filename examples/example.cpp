@@ -7,19 +7,19 @@ using namespace Knobs;
 Knob knob1( PUSH1 ), knob2( PUSH2 );
 Panel panel;
 
-void onRelease() {
+void callbackRelease() {
     Serial.print( "*release*" );
 }
 
-void onHold() {
+void callbackHold() {
     Serial.print( "*hold*" );
 }
 
-void onLonghold() {
+void callbackLonghold() {
     Serial.print( "*long*" );
 }
 
-void onClick() {
+void callbackClick() {
     Serial.print( "*click*" );
 }
 
@@ -27,7 +27,7 @@ void onDoubleClick() {
 	Serial.print( "*doubleclick*" );
 }
 
-bool onPush( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count ) {
+bool callbackPush( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t count ) {
 
 	if( &dev == &knob1 )
 			Serial.print( "*Knob1" );
@@ -38,14 +38,6 @@ bool onPush( Device &dev, Handler &h, value_t newValue, value_t oldValue, time_t
     return true;
 }
 
-Push push = Push( onPush );
-Release release = Release( onRelease );
-Hold hold = Hold( onHold, 200 ),
-     holdX = Hold( onLonghold, 500 )
-     ;
-Click click( onClick );
-DoubleClick doubleClick( onDoubleClick );
-
 void setup() {
 
     Serial.begin( 19200 );
@@ -53,15 +45,16 @@ void setup() {
 
     knob1.pullup( true )
       .invert( true )
-      .on( push )
-      .on( release )
-      .on( hold ).on( holdX )
-      .on( click )
-	  .on( doubleClick )
+      .onPush( callbackPush )
+      .onRelease( callbackRelease )
+      .onHold( callbackHold, 200 ).onHold( callbackLongHold, 500 )
+      .callbackClick( callbackClick )
+	  .onDoubleClick( onDoubleClick )
       ;
+
     knob2.pullup( true )
       .invert( true )
-	  .on( push )
+	  .onPush( callbackPush )
       ;
 
     panel << knob2 << knob1;
