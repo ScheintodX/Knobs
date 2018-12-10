@@ -18,6 +18,10 @@ Valve::Valve( const char * const name, pin_t pin ) : _name( name ), _pin( pin ) 
 	_locked = false;
 }
 
+ValveType Valve::type() {
+	return VT_SIMPLE;
+}
+
 Valve& Valve::begin() {
 	_init();
 	return *this;
@@ -28,7 +32,7 @@ void Valve::_init() {
 	if( _inputWhenOff ) {
 		_pinMode( _active );
 	} else {
-		pinMode( _pin, OUTPUT );
+		_pinMode( true );
 	}
 }
 
@@ -36,6 +40,24 @@ void Valve::_pinMode( bool to ) {
 
 	if( to ) pinMode( _pin, OUTPUT );
 	else pinMode( _pin, INPUT );
+}
+
+void Valve::_turn( bool on ) {
+
+	if( _debug ) {
+		_debug( name() );
+		_debug( ": " );
+		_debug( String( on ).c_str() );
+		_debug( "\n" );
+	}
+
+	bool to = _modify( on );
+
+	if( _inputWhenOff ) _pinMode( to );
+
+	digitalWrite( _pin, to );
+
+	if( _slave ) _slave->active( on );
 }
 
 bool Valve::_modify( bool on ) {
@@ -62,17 +84,6 @@ Valve& Valve::handover( Professor &owner ) {
 Valve& Valve::direct( Buttler &listener ) {
 	_listener = &listener;
 	return *this;
-}
-
-void Valve::_turn( bool on ) {
-
-	bool to = _modify( on );
-
-	if( _inputWhenOff ) _pinMode( to );
-
-	digitalWrite( _pin, to );
-
-	if( _slave ) _slave->active( on );
 }
 
 Valve& Valve::active( bool on, bool silent ) {
@@ -146,6 +157,11 @@ Valve& Valve::unlock() {
 }
 bool Valve::locked() {
 	return _locked;
+}
+
+Valve& Valve::debug( debugger_t debugger ) {
+	_debug = debugger;
+	return *this;
 }
 
 pin_t Valve::pin() {
@@ -270,14 +286,27 @@ Transducer& Transducer::restore() {
 	TONALL( restore );
 	return *this;
 }
+
 Transducer& Transducer::mute( bool on ){
 	TONALLP( mute, on );
 	return *this;
 }
+
 Transducer& Transducer::unmute(){
 	TONALL( unmute );
 	return *this;
 }
+
+Transducer& Transducer::direct( Buttler &listener ){
+	TONALLP( direct, listener );
+	return *this;
+}
+
+Transducer& Transducer::handover( Professor &professor ){
+	TONALLP( handover, professor );
+	return *this;
+}
+
 Transducer& Transducer::each( transducer_callback_t cb, knob_value_t val ) {
 
 	Valve *valve; \
@@ -287,19 +316,18 @@ Transducer& Transducer::each( transducer_callback_t cb, knob_value_t val ) {
 	}
 	return *this;
 }
-/*
-Transducer& Transducer::active( const char *prefix, knob_value_t val ) {
 
-	unsigned int len = strlen( prefix );
+Transducer& Transducer::each( Maid &maid, knob_value_t val ) {
 
 	Valve *valve; \
 	for( valve=_valves.first(); valve; valve=_valves.next() ) {
 
-		if( strncmp( name(), prefix, len ) ) valve->active( val );
+		maid.housekeep( *this, *valve, val );
 	}
 	return *this;
 }
-*/
+
+
 Valve* Transducer::find( const char *prefix ){
 
 	Valve *valve; \
@@ -329,6 +357,7 @@ Transducer& Transducer::print() {
 
 	return *this;
 }
+
 Transducer& Transducer::activeMask( uint32_t mask ) {
 
 	Valve *valve;
@@ -471,6 +500,14 @@ void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 	}
 }
 
+knob_time_t TimedProfessor::holdTime() {
+	return _holdTime;
+}
+TimedProfessor& TimedProfessor::holdTime( knob_time_t holdTime ){
+	_holdTime = holdTime;
+	return *this;
+}
+
 bool TimedProfessor::onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal ) {
 
 	/*
@@ -504,10 +541,15 @@ TimedValve::TimedValve( const char * const name, pin_t pin,
 	handover( _timer );
 }
 
+ValveType TimedValve::type() {
+	return VT_TIMED;
+}
+
 void TimedValve::keep() {
 
 	_timer.stop();
 
+	// Indicate operation with off-blinking
 	mute( false );
 	delay( _TP_WARNING );
 	unmute();

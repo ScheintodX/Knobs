@@ -32,10 +32,17 @@ namespace Knobs {
 	class Transducer;
 	class Professor;
 	class Buttler;
+	class Maid;
 
-	typedef void (*transducer_callback_t)( Transducer &t, Valve &valve, knob_value_t );
+	typedef void (*transducer_callback_t)( Transducer &t, Valve &valve, knob_value_t val );
+	typedef void (*valve_callback_t)( Valve &valve, knob_value_t val );
 
 	typedef uint32_t (*t_rotate_f)( uint32_t mask );
+
+	enum ValveType {
+		VT_SIMPLE,
+		VT_TIMED
+	};
 
 	// A Valve is a binary output on one pin
 	class Valve {
@@ -43,10 +50,14 @@ namespace Knobs {
 		friend class Transducer;
 		friend class Professor;
 
-		private:
-			const char * _name;
+		protected:
 
+			const char * _name;
 			const pin_t _pin;
+
+			debugger_t _debug;
+
+		private:
 
 			bool _invert : 1;
 			bool _inputWhenOff : 1;
@@ -60,6 +71,8 @@ namespace Knobs {
 			Professor *_owner;
 			Buttler *_listener;
 
+		protected:
+
 			void _init();
 			void _turn( bool on );
 			void _pinMode( bool to );
@@ -69,8 +82,12 @@ namespace Knobs {
 			Valve& _print( const char *msg, bool val );
 
 		public:
+
 			// Initialize with name and pin
 			Valve( const char * const name, pin_t pin );
+
+			// return type of valve
+			virtual ValveType type();
 
 			// Start operation
 			Valve &begin();
@@ -82,6 +99,7 @@ namespace Knobs {
 
 			// start controlling other valve when this on is operated
 			Valve &enslave( Valve &slave );
+
 			// set Professor who can do operation automatically
 			Valve& handover( Professor &owner );
 
@@ -117,6 +135,8 @@ namespace Knobs {
 			Valve& unlock();
 			// return lock state
 			bool locked();
+
+			Valve& debug( debugger_t debugger );
 
 			// return pin
 			pin_t pin();
@@ -167,6 +187,9 @@ namespace Knobs {
 
 			// Iterate all Valves and call cb on them
 			Transducer& each( transducer_callback_t cb, knob_value_t val=0 );
+
+			Transducer& each( Maid &maid, knob_value_t val=0 );
+
 			// Find one valve by prefix
 			Valve* find( const char *prefix );
 
@@ -190,6 +213,12 @@ namespace Knobs {
 			// unmute all Valves. (calls Valves' unmute)
 			Transducer& unmute();
 
+			// direct to Buttler for all Valves
+			Transducer& direct( Buttler &listener );
+			// Handover all valves to Professor
+			Transducer& handover( Professor &professor );
+
+
 			// return amount of Valves
 			int fill();
 
@@ -205,7 +234,7 @@ namespace Knobs {
 
 	// Operation can be handed over to an (Mad) Scientist
 	// Professor's methods are called on looping and on change
-	// He is able to change the outcome of operations
+	// He is able to change the outcome of operations (onChange returns bool)
 	class Professor {
 
 		public:
@@ -213,13 +242,30 @@ namespace Knobs {
 			virtual bool onChange( Valve &valve, knob_value_t oldVal, knob_value_t newVal ) = 0;
 	};
 
-	// A Buttler can look at the Valve and to stuff when it's
-	// state changes. But he can't alter the Valve's state
-	class Buttler {
+	// Like a buttler a maid can look at Valves.
+	// Unlike a Buttler a Maid doesn't react to changes but does the regular stuff
+	// Maidens are only employed externally. So they are not attached to any Valve.
+	class Maid {
 
 		public:
+			// Called by Transducer->each
+			virtual void housekeep( Transducer &transducer, Valve &valve, knob_value_t val ) = 0;
+	};
+
+	// A Buttler can look at the Valve and do stuff when it's
+	// state changes. But he can't alter the outcome of change operations (onChange returns void)
+	// Buttlers are employed permanetly on their Valves.
+	class Buttler : public Maid {
+
+		public:
+			// Implement this method which is called whenever Valve's value changes
 			virtual void onChange( Valve &valve, knob_value_t oldVal, knob_value_t newVal ) = 0;
 
+			// This is called by Transducer->each
+			// Normally a buttler does the same as onChange unless overridden
+			virtual void housekeep( Transducer &transducer, Valve &valve, knob_value_t val ) override {
+				onChange( valve, val, val );
+			}
 	};
 
 	// "I'm too late"
@@ -227,7 +273,7 @@ namespace Knobs {
 	class TimedProfessor : public Professor {
 
 		private:
-			const knob_time_t _holdTime;
+			knob_time_t _holdTime;
 			knob_time_t _startTime;
 			knob_time_t _running;
 
@@ -241,6 +287,9 @@ namespace Knobs {
 			void start();
 			void stop();
 			void reset();
+
+			knob_time_t holdTime();
+			TimedProfessor& holdTime( knob_time_t time );
 
 		public:
 			virtual void onLoop( Valve &owner, knob_time_t time );
@@ -263,6 +312,8 @@ namespace Knobs {
 					knob_time_t holdTime, knob_time_t firstWarning, knob_time_t secondWarning );
 
 			void keep();
+
+			virtual ValveType type();
 
 			TimedProfessor &timer();
 	};

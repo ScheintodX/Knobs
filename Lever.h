@@ -92,7 +92,7 @@ namespace Knobs {
 	class Transpose : public LeverModifier {
 
 		private:
-			const knob_value_t _min;
+			const knob_value_t _minValue;
 			const knob_value_t _range;
 
 		public:
@@ -147,17 +147,17 @@ namespace Knobs {
 	 * avg_new = avg_old * --------- + val_new
 	 *                      samples
 	 *
-	 * This method requires a startup period in which no average 
+	 * This method requires a startup period in which no average
 	 * value is available.
 	 * It uses the first sample as startup value. Then 'samples'
 	 * values are collected and averaged according to above method.
-	 * Only after '_samples' samples the average is regarded as 
+	 * Only after '_samples' samples the average is regarded as
 	 * "stable" and values are returned.
 	 ****************/
 	class RunningAverage : public LeverModifier {
 
 		protected:
-			knob_float_t _avg;
+			knob_float_t _avgValue;
 			const knob_value_t _samples;
 			knob_value_t _count;
 
@@ -171,8 +171,8 @@ namespace Knobs {
 
 		private:
 			//const knob_value_t PRERUN = 1000;
-			knob_value_t _min;
-			knob_value_t _max;
+			knob_value_t _minValue;
+			knob_value_t _maxValue;
 
 		public:
 			Deviation( knob_time_t time );
@@ -183,8 +183,8 @@ namespace Knobs {
 
 		private:
 			//const knob_value_t PRERUN = 1000;
-			knob_value_t _min;
-			knob_value_t _max;
+			knob_value_t _minValue;
+			knob_value_t _maxValue;
 
 		public:
 			RunningDeviation( knob_value_t samples );

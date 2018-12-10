@@ -11,6 +11,9 @@ namespace Knobs {
 	typedef int64_t big_knob_value_t;
 	typedef int64_t knob_time_t;
 	typedef float knob_float_t;
+
+	typedef void (*debugger_t)( const char *msg ); // + float value?
+
 }
 
 #endif

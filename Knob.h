@@ -311,6 +311,26 @@ namespace Knobs {
 
 	};
 
+	class SlowAveragingHysteresis : public Handler {
+
+		private:
+			const unsigned long _DELAY = 1000;
+
+			const float _upper_bound;
+			const float _lower_bound;
+			const int _averaging;
+
+			knob_time_t _lastTime;
+			float _value;
+
+		public:
+			SlowAveragingHysteresis( callback_t callback,
+					float lower_bound, float upper_bound, int averaging );
+
+			virtual bool handle( Device &dev,
+					knob_value_t newState, knob_value_t oldState, knob_time_t time );
+	};
+
 	// A Device is one physical thing which is used to interact.
 	// One device can have multiple handlers.
 	// E.g. one "push button" a.k.a "Knob" device can have handlers for click, push, hold, etc...
@@ -328,6 +348,7 @@ namespace Knobs {
 			Canister<Handler,KNOBS_HANDLER_CANISTER_SIZE> _handlers;
 
 			Device *_slave;
+			debugger_t _debug;
 
 		protected:
 			void _activate( knob_value_t newState,
@@ -347,6 +368,8 @@ namespace Knobs {
 
 			// add a handler
 			Device& on( Handler &handler );
+
+			Device &debug( debugger_t debugger );
 
 			// return name
 			const char *name();

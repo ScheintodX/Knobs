@@ -19,7 +19,7 @@ using namespace Knobs;
 *
 *****************************************************************************/
 
-AnalogDevice::AnalogDevice( const char *name, pin_t pin ) 
+AnalogDevice::AnalogDevice( const char *name, pin_t pin )
 		: Device( name )
 		, _pin( pin ) {
 
@@ -40,11 +40,11 @@ AnalogDevice& AnalogDevice::pullup( bool on ) {
 
 /*****************************************************************************
 *
-*   L E V E R  
+*   L E V E R
 *
 *****************************************************************************/
 
-Lever::Lever( const char *name, pin_t pin, knob_value_t min, knob_value_t max ) 
+Lever::Lever( const char *name, pin_t pin, knob_value_t min, knob_value_t max )
 		: AnalogDevice( name, pin )
 		, minValue( min ), maxValue( max ) {
 
@@ -97,8 +97,8 @@ void Lever::loop(){
 *
 *****************************************************************************/
 
-Transpose::Transpose( knob_value_t min, knob_value_t max ) 
-		: _min( min )
+Transpose::Transpose( knob_value_t min, knob_value_t max )
+		: _minValue( min )
 		, _range( max-min ) {
 }
 
@@ -107,7 +107,7 @@ bool Transpose::modify( Lever &lever, knob_value_t *val ) {
 	register big_knob_value_t v = *val;
 	knob_value_t range = lever.maxValue - lever.minValue;
 
-	v = (v-lever.minValue) * _range / range - _min;
+	v = (v-lever.minValue) * _range / range - _minValue;
 
 	*val = (knob_value_t) v;
 
@@ -169,11 +169,11 @@ bool AverageTime::modify( Lever &lever, knob_value_t *val ) {
 	}
 }
 
-RunningAverage::RunningAverage( knob_value_t samples ) 
+RunningAverage::RunningAverage( knob_value_t samples )
 		: _samples( samples ) {
 
 	_count = 0;
-	_avg = 0;
+	_avgValue = 0;
 }
 
 bool RunningAverage::modify( Lever &lever, knob_value_t *val ) {
@@ -182,13 +182,13 @@ bool RunningAverage::modify( Lever &lever, knob_value_t *val ) {
 	//col( _count );
 
 	// Startup: First value is stored
-	if( _count == 0 ) _avg = *val;
+	if( _count == 0 ) _avgValue = *val;
 
 	//col( _avg*100 );
 
-	_avg = ( _avg * (_samples-1) + *val ) / _samples;
+	_avgValue = ( _avgValue * (_samples-1) + *val ) / _samples;
 
-	//col( _avg*100 );
+	//col( _avgValue*100 );
 
 	_count++;
 
@@ -197,7 +197,7 @@ bool RunningAverage::modify( Lever &lever, knob_value_t *val ) {
 
 	_count = _samples; // prevent overflow
 
-	*val = (knob_value_t)_avg;
+	*val = (knob_value_t)_avgValue;
 
 	//col( *val );
 
@@ -205,11 +205,11 @@ bool RunningAverage::modify( Lever &lever, knob_value_t *val ) {
 }
 
 
-Deviation::Deviation( knob_time_t time ) 
+Deviation::Deviation( knob_time_t time )
 		: AverageTime( time ) {
 
-	_min = KNOB_VAL_MAX;
-	_max = KNOB_VAL_MIN;
+	_minValue = KNOB_VAL_MAX;
+	_maxValue = KNOB_VAL_MIN;
 }
 
 bool Deviation::modify( Lever &lever, knob_value_t *val ) {
@@ -218,19 +218,19 @@ bool Deviation::modify( Lever &lever, knob_value_t *val ) {
 	knob_value_t tmp = *val;
 	knob_value_t delta;
 
-	_min = Math::min( _min, tmp );
-	_max = Math::max( _max, tmp );
+	_minValue = Math::kmin( _minValue, tmp );
+	_maxValue = Math::kmax( _maxValue, tmp );
 
 	ok = AverageTime::modify( lever, &tmp );
 
 	if( ok ) {
 
-		delta = ( Math::abs( _max - tmp ), Math::abs( tmp - _min ) ) / 2;
+		delta = ( Math::kabs( _maxValue - tmp ), Math::kabs( tmp - _minValue ) ) / 2;
 
 		*val = delta;
 
-		_min = KNOB_VAL_MAX;
-		_max = KNOB_VAL_MIN;
+		_minValue = KNOB_VAL_MAX;
+		_maxValue = KNOB_VAL_MIN;
 
 		return true;
 
@@ -243,8 +243,8 @@ bool Deviation::modify( Lever &lever, knob_value_t *val ) {
 RunningDeviation::RunningDeviation( knob_value_t samples )
 		: RunningAverage( samples ) {
 
-	_min = 0;
-	_max = 0;
+	_minValue = 0;
+	_maxValue = 0;
 }
 
 bool RunningDeviation::modify( Lever &lever, knob_value_t *val ) {
@@ -253,23 +253,23 @@ bool RunningDeviation::modify( Lever &lever, knob_value_t *val ) {
 
 	bool ok = RunningAverage::modify( lever, &avg );
 
-	if( *val < _avg ) {
-		
-		_min = ( _min * (_samples-1) + *val ) / _samples;
+	if( *val < _avgValue ) {
 
-	} else if( *val > _avg ) {
+		_minValue = ( _minValue * (_samples-1) + *val ) / _samples;
 
-		_max = ( _max * (_samples-1) + *val ) / _samples;
+	} else if( *val > _avgValue ) {
+
+		_maxValue = ( _maxValue * (_samples-1) + *val ) / _samples;
 
 	} else {
 
-		_min = ( _min * (_samples-1) + *val ) / _samples;
-		_max = ( _max * (_samples-1) + *val ) / _samples;
+		_minValue = ( _minValue * (_samples-1) + *val ) / _samples;
+		_maxValue = ( _maxValue * (_samples-1) + *val ) / _samples;
 	}
 
 	if( !ok ) return false;
 
-	*val = ( Math::abs( _min ) + Math::abs( _max ) ) / 2;
+	*val = ( Math::kabs( _minValue ) + Math::kabs( _maxValue ) ) / 2;
 
 	return true;
 
@@ -283,7 +283,7 @@ bool RunningDeviation::modify( Lever &lever, knob_value_t *val ) {
 *****************************************************************************/
 
 /*
-Change::Change( callback_t callback ) 
+Change::Change( callback_t callback )
 		: Handler( HT_CHANGE, callback ) {
 
 }
