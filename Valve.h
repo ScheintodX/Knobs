@@ -55,12 +55,10 @@ namespace Knobs {
 			const char * _name;
 			const pin_t _pin;
 
-			debugger_t _debug;
-
 		private:
 
 			bool _invert : 1;
-			bool _inputWhenOff : 1;
+			bool _opendrain : 1;
 
 			bool _active : 1;
 			bool _stored : 1;
@@ -81,6 +79,7 @@ namespace Knobs {
 
 			Valve& _print( const char *msg, bool val );
 
+
 		public:
 
 			// Initialize with name and pin
@@ -95,7 +94,7 @@ namespace Knobs {
 			// Logical invert output
 			Valve &invert( bool on );
 			// Turn pin to input when set to false
-			Valve &inputWhenOff( bool on );
+			Valve &opendrain( bool on );
 
 			// start controlling other valve when this on is operated
 			Valve &enslave( Valve &slave );
@@ -136,12 +135,12 @@ namespace Knobs {
 			// return lock state
 			bool locked();
 
-			Valve& debug( debugger_t debugger );
-
 			// return pin
 			pin_t pin();
 			// return name
 			const char * name();
+
+			Valve& print();
 
 			// call periodically in main loop. calls should be every 50ms or quicker
 			virtual void loop( knob_time_t time );
@@ -222,11 +221,10 @@ namespace Knobs {
 			// return amount of Valves
 			int fill();
 
-			// debug print state of all valves
-			Transducer& print();
-
 			// return transducer's name
 			const char * name();
+
+			Transducer& print();
 
 			// call periodically in main loop. calls should be every 50ms or quicker
 			void loop();
@@ -273,12 +271,13 @@ namespace Knobs {
 	class TimedProfessor : public Professor {
 
 		private:
+			const knob_time_t _firstWarning;
+			const knob_time_t _secondWarning;
+
 			knob_time_t _holdTime;
+
 			knob_time_t _startTime;
 			knob_time_t _running;
-
-			knob_time_t _firstWarning;
-			knob_time_t _secondWarning;
 
 		public:
 			TimedProfessor( knob_time_t holdTime );

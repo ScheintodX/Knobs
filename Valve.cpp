@@ -8,14 +8,30 @@
 
 using namespace Knobs;
 
+
+
+
+
+
+
+
+
+
+
+
+
 Valve::Valve( const char * const name, pin_t pin ) : _name( name ), _pin( pin ) {
 
 	_active = false;
 	_invert = false;
 	_stored = false;
-	_inputWhenOff = false;
+	_opendrain = false;
 	_mute = false;
 	_locked = false;
+
+	_slave = NULL;
+	_owner = NULL;
+	_listener = NULL;
 }
 
 ValveType Valve::type() {
@@ -29,7 +45,7 @@ Valve& Valve::begin() {
 
 void Valve::_init() {
 
-	if( _inputWhenOff ) {
+	if( _opendrain ) {
 		_pinMode( _active );
 	} else {
 		_pinMode( true );
@@ -44,16 +60,9 @@ void Valve::_pinMode( bool to ) {
 
 void Valve::_turn( bool on ) {
 
-	if( _debug ) {
-		_debug( name() );
-		_debug( ": " );
-		_debug( String( on ).c_str() );
-		_debug( "\n" );
-	}
-
 	bool to = _modify( on );
 
-	if( _inputWhenOff ) _pinMode( to );
+	if( _opendrain ) _pinMode( to );
 
 	digitalWrite( _pin, to );
 
@@ -69,8 +78,8 @@ Valve& Valve::invert( bool on ) {
 	_invert = on;
 	return *this;
 }
-Valve& Valve::inputWhenOff( bool on ) {
-	_inputWhenOff = on;
+Valve& Valve::opendrain( bool on ) {
+	_opendrain = on;
 	return *this;
 }
 Valve& Valve::enslave( Valve &slave ) {
@@ -110,21 +119,15 @@ bool Valve::active() {
 
 Valve& Valve::store() {
 
-	//_print( "store", _active );
-
 	_stored = _active;
 	return *this;
 }
 Valve& Valve::restore() {
 
-	//_print( "re-store", _stored );
-
 	return active( _stored );
 }
 
 Valve& Valve::mute( bool on ) {
-
-	//_print( "M", on );
 
 	_mute = true;
 	_turn( on );
@@ -132,8 +135,6 @@ Valve& Valve::mute( bool on ) {
 	return *this;
 }
 Valve& Valve::unmute() {
-
-	//_print( "*m*", _active );
 
 	if( !_mute ) return *this;
 
@@ -157,11 +158,6 @@ Valve& Valve::unlock() {
 }
 bool Valve::locked() {
 	return _locked;
-}
-
-Valve& Valve::debug( debugger_t debugger ) {
-	_debug = debugger;
-	return *this;
 }
 
 pin_t Valve::pin() {
@@ -433,35 +429,35 @@ void Transducer::loop() {
  */
 
 TimedProfessor::TimedProfessor( knob_time_t holdTime )
-		: _holdTime( holdTime )
-		, _firstWarning( _TP_FIRST_WARNING )
+		: _firstWarning( _TP_FIRST_WARNING )
 		, _secondWarning( _TP_SECOND_WARNING )
 		{
 
+	_holdTime = holdTime;
+
 	_running = false;
+	_startTime = 0;
 }
 
 TimedProfessor::TimedProfessor( knob_time_t holdTime,
 		knob_time_t firstWarning, knob_time_t secondWarning )
-		: _holdTime( holdTime )
-		, _firstWarning( firstWarning )
+		: _firstWarning( firstWarning )
 		, _secondWarning( secondWarning )
 		{
 
+	_holdTime = holdTime;
+
 	_running = false;
+	_startTime = 0;
 }
 
 void TimedProfessor::start() {
-
-	//Serial.println( "*T/start*" );
 
 	_startTime = millis();
 	_running = true;
 }
 
 void TimedProfessor::stop() {
-
-	//Serial.println( "*T/stop*" );
 
 	_running = false;
 }
@@ -477,7 +473,7 @@ void TimedProfessor::onLoop( Valve &owner, knob_time_t time ) {
 
 	if( !_running ) return;
 
-	register knob_time_t end = _startTime + _holdTime;
+	knob_time_t end = _startTime + _holdTime;
 
 	if( _TIME( 0 ) ){
 		owner.active( false ); // stops becuase of callback
@@ -509,14 +505,6 @@ TimedProfessor& TimedProfessor::holdTime( knob_time_t holdTime ){
 }
 
 bool TimedProfessor::onChange( Valve &owner, knob_value_t oldVal, knob_value_t newVal ) {
-
-	/*
-	Serial.print( "*T/onChange: " );
-	Serial.print( oldVal );
-	Serial.print( "->" );
-	Serial.print( newVal );
-	Serial.println( "*" );
-	*/
 
 	if( ! oldVal && newVal ) start();
 	if( oldVal && !newVal ) stop();

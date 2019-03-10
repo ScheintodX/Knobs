@@ -33,6 +33,19 @@ namespace Knobs {
 	typedef bool (*callback_t)( Device &dev, Handler &handler,
 			knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
+	class Callable {
+		public:
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count ) = 0;
+	};
+	class SimpleCallable : public Callable {
+		public:
+			virtual bool call( knob_value_t val ) = 0;
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count )
+					{ return call( newState ); }
+	};
+
 	enum HandlerType {
 		HT_ALWAYS=0,
 		HT_PUSH=1, HT_ACTIVATE=1,
@@ -48,6 +61,7 @@ namespace Knobs {
 		HT_OVER=11,
 		HT_UNDER=12,
 		HT_HYSTERESIS=13,
+		HT_DELAYED_CHOISE=14,
 		HT_TRANSPORT=99
 	};
 
@@ -63,6 +77,7 @@ namespace Knobs {
 
 			const callback_t _cb;
 			const minimal_callback_t _cbm;
+			Callable *_ca;
 
 			virtual bool _callback( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t count );
@@ -73,6 +88,7 @@ namespace Knobs {
 
 			Handler( HandlerType type, minimal_callback_t callback );
 			Handler( HandlerType type, callback_t callback );
+			Handler( HandlerType type, Callable &callback );
 
 			// called periodically with Knob's state
 			// Override to implement Handlers functionallity
@@ -153,7 +169,7 @@ namespace Knobs {
 	// while the max time of on can be set
 	class Click : public Handler {
 
-		static const knob_time_t MAX_TIME_CLICK = 0;
+		static const knob_time_t MAX_TIME_CLICK = 500;
 
 		private:
 			const knob_time_t _maxTimeClick;
@@ -184,7 +200,7 @@ namespace Knobs {
 			const knob_time_t _maxTimeInbetween;
 			const uint8_t _maxClicks;
 
-			knob_time_t _timeStartSequence;
+			knob_time_t _timeLastClick;
 			knob_value_t _clicks;
 
 		protected:
@@ -314,7 +330,7 @@ namespace Knobs {
 	class SlowAveragingHysteresis : public Handler {
 
 		private:
-			const unsigned long _DELAY = 1000;
+			static const unsigned long _DELAY = 1000;
 
 			const float _upper_bound;
 			const float _lower_bound;
@@ -347,14 +363,15 @@ namespace Knobs {
 			const char *_name;
 			Canister<Handler,KNOBS_HANDLER_CANISTER_SIZE> _handlers;
 
+			bool _mute;
+
 			Device *_slave;
-			debugger_t _debug;
 
 		protected:
 			void _activate( knob_value_t newState,
 					knob_value_t oldState, knob_time_t count );
+
 			Device( const char *name );
-			bool _mute;
 
 		public:
 			// remote controll other Device
@@ -362,14 +379,13 @@ namespace Knobs {
 
 			// pause operation
 			Device& mute( bool mute );
+			bool mute();
 
 			// must be called periodically. At best < every 20ms
 			virtual void loop() = 0;
 
 			// add a handler
 			Device& on( Handler &handler );
-
-			Device &debug( debugger_t debugger );
 
 			// return name
 			const char *name();
@@ -422,10 +438,13 @@ namespace Knobs {
 	// BooleanDevice: One device which watches one digital input pin
 	class BooleanDevice : public Device {
 
-		protected:
+		private:
 			const pin_t _pin;
 
+		protected:
+
 			bool _invert;
+
 			bool _read();
 
 		public:
@@ -438,7 +457,6 @@ namespace Knobs {
 			BooleanDevice& invert( bool on );
 
 			pin_t pin();
-
 	};
 
 	// Knob: An implementation of an boolean device which is debounced.
