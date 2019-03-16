@@ -81,6 +81,7 @@ namespace Knobs {
             knob_value_t _sum;
 
 		public:
+
             DelayedChoise( Callable *callable, knob_time_t delay );
 
 			virtual bool handle( Device &dev,

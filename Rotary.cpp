@@ -144,7 +144,6 @@ void Rotary::_f2() {
 }
 
 
-
 DelayedChoise::DelayedChoise( Callable *callable, knob_time_t delay )
         : Handler( HT_DELAYED_CHOISE, callable )
         , _delay( delay ){

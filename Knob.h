@@ -33,10 +33,6 @@ namespace Knobs {
 	typedef bool (*callback_t)( Device &dev, Handler &handler,
 			knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
-	typedef bool (*minimal_callback_method_t)( void *obj, knob_value_t val );
-	typedef bool (*callback_method_t)( void *obj, Device &dev, Handler &handler,
-			knob_value_t newState, knob_value_t oldState, knob_time_t count );
-
 	class Callable {
 		public:
 			virtual bool call( Device &dev, Handler &handler,
@@ -69,27 +65,38 @@ namespace Knobs {
 				 return _cb( newState );
 			}
 	};
+
+	template <class T>
+	using callback_method_t = bool (T::*)( Device &dev, Handler &handler,
+			knob_value_t newState, knob_value_t oldState, knob_time_t count );
+
+	template <class T>
 	class MethodCallback : public Callable {
 		private:
-			void* _obj;
-			const callback_method_t _cb;
+			T* _obj;
+			callback_method_t<T> _cb;
 		public:
-			MethodCallback( void *obj, callback_method_t cb ) : _obj( obj ), _cb( cb ) {}
+			MethodCallback( void *obj, callback_method_t<T> cb ) : _obj( obj ), _cb( cb ) {}
 			virtual bool call( Device &dev, Handler &handler,
 					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
 				 return _cb( _obj, dev, handler, newState, oldState, count );
 			}
 
 	};
+
+	template <class T>
+	using minimal_callback_method_t = bool (T::*)( knob_value_t );
+
+	template <class T>
 	class MinimalMethodCallback : public Callable {
 		private:
-			void* _obj;
-			const minimal_callback_method_t _cb;
+			T* _obj;
+			minimal_callback_method_t<T> _cb;
 		public:
-			MinimalMethodCallback( void *obj, minimal_callback_method_t cb ) : _obj( obj ), _cb( cb ) {}
+			MinimalMethodCallback( T *obj, minimal_callback_method_t<T> cb ) : _obj( obj ), _cb( cb ) {}
 			virtual bool call( Device &dev, Handler &handler,
 					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
-				 return _cb( _obj, newState );
+				 return (_obj->*_cb)( newState );
 			}
 	};
 
@@ -416,6 +423,10 @@ namespace Knobs {
 			const char *name();
 
 			#define ON( WHAT ) \
+					inline Device& on ## WHAT( Callable &cb ) { \
+						on( new WHAT( &cb ) ); \
+						return *this; \
+					} \
 					inline Device& on ## WHAT( minimal_callback_t cb ) { \
 						on( new WHAT( new MinimalFunctionCallback( cb ) ) ); \
 						return *this; \
@@ -424,11 +435,21 @@ namespace Knobs {
 						on( new WHAT( new FunctionCallback( cb ) ) ); \
 						return *this; \
 					} \
-					inline Device& on ## WHAT( Callable &cb ) { \
-						on( new WHAT( &cb ) ); \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, minimal_callback_method_t<T> cb ) { \
+						on( new WHAT( new MinimalMethodCallback<T>( obj, cb ) ) ); \
+						return *this; \
+					} \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, callback_method_t<T> cb ) { \
+						on( new WHAT( new MethodCallback<T>( obj, cb ) ) ); \
 						return *this; \
 					}
 			#define ONP( WHAT, TYPE ) \
+					inline Device& on ## WHAT( Callable &cb, TYPE val ) { \
+						on( new WHAT( &cb, val ) ); \
+						return *this; \
+					} \
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE val ) { \
 						on( new WHAT( new MinimalFunctionCallback( cb ), val ) ); \
 						return *this; \
@@ -437,11 +458,22 @@ namespace Knobs {
 						on( new WHAT( new FunctionCallback( cb ), val ) ); \
 						return *this; \
 					} \
-					inline Device& on ## WHAT( Callable &cb, TYPE val ) { \
-						on( new WHAT( &cb, val ) ); \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, minimal_callback_method_t<T> cb, TYPE val ) { \
+						on( new WHAT( new MinimalMethodCallback<T>( obj, cb ), val ) ); \
+						return *this; \
+					} \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, callback_method_t<T> cb, TYPE val ) { \
+						on( new WHAT( new MethodCallback<T>( obj, cb ), val ) ); \
 						return *this; \
 					}
+
 			#define ONPP( WHAT, TYPE1, TYPE2 ) \
+					inline Device& on ## WHAT( Callable &cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( new WHAT( &cb, val1, val2 ) ); \
+						return *this; \
+					} \
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
 						on( new WHAT( new MinimalFunctionCallback( cb ), val1, val2 ) ); \
 						return *this; \
@@ -450,8 +482,14 @@ namespace Knobs {
 						on( new WHAT( new FunctionCallback( cb ), val1, val2 ) ); \
 						return *this; \
 					} \
-					inline Device& on ## WHAT( Callable &cb, TYPE1 val1, TYPE2 val2 ) { \
-						on( new WHAT( &cb, val1, val2 ) ); \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, minimal_callback_method_t<T> cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( new WHAT( new MinimalMethodCallback<T>( obj, cb ), val1, val2 ) ); \
+						return *this; \
+					} \
+					template<class T> \
+					inline Device& on ## WHAT( T *obj, callback_method_t<T> cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( new WHAT( new MethodCallback<T>( obj, cb ), val1, val2 ) ); \
 						return *this; \
 					}
 
