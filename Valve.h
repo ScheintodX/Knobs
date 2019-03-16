@@ -219,7 +219,7 @@ namespace Knobs {
 
 
 			// return amount of Valves
-			int fill();
+			int fill() const;
 
 			// return transducer's name
 			const char * name();

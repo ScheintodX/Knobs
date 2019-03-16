@@ -76,8 +76,8 @@ Rotary& Rotary::_start(){
         return *this;
     }
 
-    pinMode(_p1, INPUT_PULLUP);
-    pinMode(_p2, INPUT_PULLUP);
+    pinMode( _p1, INPUT );
+    pinMode( _p2, INPUT );
     _v1 = digitalRead(_p1) ? +1 : -1;
     _v2 = digitalRead(_p2) ? +1 : -1;
 
@@ -86,6 +86,16 @@ Rotary& Rotary::_start(){
 
 int32_t Rotary::value(){
     return _read();
+}
+
+Rotary& Rotary::pullup( bool pullup ){
+    pinMode( _p1, pullup ? INPUT_PULLUP : INPUT );
+    pinMode( _p2, pullup ? INPUT_PULLUP : INPUT );
+    return *this;
+}
+Rotary& Rotary::invert( bool invert ){
+    _invert = invert;
+    return *this;
 }
 
 void Rotary::loop(){
@@ -101,7 +111,7 @@ void Rotary::loop(){
 }
 
 void Rotary::_c1(){
-    digitalRead( _p1 ) ? _r1() : _f1();
+    digitalRead( _p1 ) ^ _invert ? _r1() : _f1();
 }
 void Rotary::_r1() {
     // the 'ifs' are
@@ -118,7 +128,7 @@ void Rotary::_f1() {
     }
 }
 void Rotary::_c2(){
-    digitalRead( _p2 ) ? _r2() : _f2();
+    digitalRead( _p2 ) ^ _invert ? _r2() : _f2();
 }
 void Rotary::_r2() {
     if( _v2 != 1 ) {
@@ -134,23 +144,8 @@ void Rotary::_f2() {
 }
 
 
-DelayedChoise::DelayedChoise( callback_t callback, knob_time_t delay )
-        : Handler( HT_DELAYED_CHOISE, callback )
-        , _delay( delay ){
 
-    _lastTime = 0;
-    _sum = 0;
-}
-
-DelayedChoise::DelayedChoise( minimal_callback_t callback, knob_time_t delay )
-        : Handler( HT_DELAYED_CHOISE, callback )
-        , _delay( delay ){
-
-    _lastTime = 0;
-    _sum = 0;
-}
-
-DelayedChoise::DelayedChoise( Callable &callable, knob_time_t delay )
+DelayedChoise::DelayedChoise( Callable *callable, knob_time_t delay )
         : Handler( HT_DELAYED_CHOISE, callable )
         , _delay( delay ){
 

@@ -36,6 +36,7 @@ namespace Knobs {
 
             int _v1, _v2;
             int32_t _value, _lastValue;
+            bool _invert;
 
 
         public:
@@ -43,12 +44,16 @@ namespace Knobs {
 
             Rotary( const char *name, pin_t p1, pin_t p2 ) : Rotary( name, p1, p2, 1 ){};
 
+            Rotary& pullup( bool pullup );
+            Rotary& invert( bool invert );
+
             virtual void loop();
 
         private:
 
             Rotary& _start();
 
+        public:
             int32_t value();
 
         private:
@@ -76,9 +81,7 @@ namespace Knobs {
             knob_value_t _sum;
 
 		public:
-			DelayedChoise( callback_t callback, knob_time_t delay );
-			DelayedChoise( minimal_callback_t callback, knob_time_t delay );
-            DelayedChoise( Callable &callable, knob_time_t delay );
+            DelayedChoise( Callable *callable, knob_time_t delay );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );

@@ -50,10 +50,10 @@ namespace Knobs {
 				return next();
 			}
 
-			inline int fill() {
+			inline int fill() const {
 				return _fill;
 			}
-			inline int capacity() {
+			inline int capacity() const {
 				return N;
 			}
 

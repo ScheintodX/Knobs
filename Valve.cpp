@@ -337,7 +337,7 @@ Valve* Transducer::find( const char *prefix ){
 	return NULL;
 }
 
-int Transducer::fill() {
+int Transducer::fill() const {
 	return _valves.fill();
 }
 

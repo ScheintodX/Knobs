@@ -33,6 +33,10 @@ namespace Knobs {
 	typedef bool (*callback_t)( Device &dev, Handler &handler,
 			knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
+	typedef bool (*minimal_callback_method_t)( void *obj, knob_value_t val );
+	typedef bool (*callback_method_t)( void *obj, Device &dev, Handler &handler,
+			knob_value_t newState, knob_value_t oldState, knob_time_t count );
+
 	class Callable {
 		public:
 			virtual bool call( Device &dev, Handler &handler,
@@ -44,6 +48,49 @@ namespace Knobs {
 			virtual bool call( Device &dev, Handler &handler,
 					knob_value_t newState, knob_value_t oldState, knob_time_t count )
 					{ return call( newState ); }
+	};
+	class FunctionCallback : public Callable {
+		private:
+			const callback_t _cb;
+		public:
+			FunctionCallback( callback_t cb ) : _cb( cb ) {}
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
+				 return _cb( dev, handler, newState, oldState, count );
+			}
+	};
+	class MinimalFunctionCallback : public Callable {
+		private:
+			const minimal_callback_t _cb;
+		public:
+			MinimalFunctionCallback( minimal_callback_t cb ) : _cb( cb ) {}
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
+				 return _cb( newState );
+			}
+	};
+	class MethodCallback : public Callable {
+		private:
+			void* _obj;
+			const callback_method_t _cb;
+		public:
+			MethodCallback( void *obj, callback_method_t cb ) : _obj( obj ), _cb( cb ) {}
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
+				 return _cb( _obj, dev, handler, newState, oldState, count );
+			}
+
+	};
+	class MinimalMethodCallback : public Callable {
+		private:
+			void* _obj;
+			const minimal_callback_method_t _cb;
+		public:
+			MinimalMethodCallback( void *obj, minimal_callback_method_t cb ) : _obj( obj ), _cb( cb ) {}
+			virtual bool call( Device &dev, Handler &handler,
+					knob_value_t newState, knob_value_t oldState, knob_time_t count ) {
+				 return _cb( _obj, newState );
+			}
 	};
 
 	enum HandlerType {
@@ -65,7 +112,6 @@ namespace Knobs {
 		HT_TRANSPORT=99
 	};
 
-
 	 // A handler encapsulates on type of action which is looked for in order to do something.
 	 // Examples are: push, click, hold, etc...
 	 // Handlers have one callback which is called then the Handler thinks it should be.
@@ -75,8 +121,6 @@ namespace Knobs {
 
 		protected:
 
-			const callback_t _cb;
-			const minimal_callback_t _cbm;
 			Callable *_ca;
 
 			virtual bool _callback( Device &dev,
@@ -86,9 +130,7 @@ namespace Knobs {
 
 			const HandlerType type;
 
-			Handler( HandlerType type, minimal_callback_t callback );
-			Handler( HandlerType type, callback_t callback );
-			Handler( HandlerType type, Callable &callback );
+			Handler( HandlerType type, Callable *callback );
 
 			// called periodically with Knob's state
 			// Override to implement Handlers functionallity
@@ -102,8 +144,7 @@ namespace Knobs {
 
 		public:
 
-			Always( callback_t callback );
-			Always( minimal_callback_t callback );
+			Always( Callable *callback );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -115,8 +156,7 @@ namespace Knobs {
 
 		public:
 
-			Push( callback_t callback );
-			Push( minimal_callback_t callback );
+			Push( Callable *callback );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -129,8 +169,7 @@ namespace Knobs {
 
 		public:
 
-			Release( callback_t callback );
-			Release( minimal_callback_t callback );
+			Release( Callable *callback );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -142,8 +181,7 @@ namespace Knobs {
 	class Toggle : public Handler {
 
 		public:
-			Toggle( callback_t callback );
-			Toggle( minimal_callback_t callback );
+			Toggle( Callable *callback );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -158,8 +196,7 @@ namespace Knobs {
 			const knob_time_t _periode;
 
 		public:
-			Transport( callback_t callback, knob_time_t periode );
-			Transport( minimal_callback_t callback, knob_time_t periode );
+			Transport( Callable *callback, knob_time_t periode );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -176,14 +213,11 @@ namespace Knobs {
 			knob_time_t _timeStart;
 
 		protected:
-			Click( HandlerType type, callback_t callback,
-					knob_time_t maxTimeClick = MAX_TIME_CLICK );
-			Click( HandlerType type, minimal_callback_t callback,
+			Click( HandlerType type, Callable *callback,
 					knob_time_t maxTimeClick = MAX_TIME_CLICK );
 
 		public:
-			Click( callback_t callback, knob_time_t maxTime = MAX_TIME_CLICK );
-			Click( minimal_callback_t callback, knob_time_t maxTime = MAX_TIME_CLICK );
+			Click( Callable *callback, knob_time_t maxTimeClick = MAX_TIME_CLICK );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -209,12 +243,7 @@ namespace Knobs {
 					knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
 		public:
-			DoubleClick( callback_t callback,
-					knob_value_t maxClicks = 2,
-					knob_time_t maxTimeClick = MAX_TIME_CLICK,
-					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
-			);
-			DoubleClick( minimal_callback_t callback,
+			DoubleClick( Callable *callable,
 					knob_value_t maxClicks = 2,
 					knob_time_t maxTimeClick = MAX_TIME_CLICK,
 					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
@@ -243,11 +272,7 @@ namespace Knobs {
 			virtual bool _callback( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t count );
 
 		public:
-			MultiClick( callback_t callback,
-					knob_time_t maxTimeClick = MAX_TIME_CLICK,
-					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
-			);
-			MultiClick( minimal_callback_t callback,
+			MultiClick( Callable *callable,
 					knob_time_t maxTimeClick = MAX_TIME_CLICK,
 					knob_time_t maxTimeInbetween = MAX_TIME_INBETWEEN
 			);
@@ -268,8 +293,7 @@ namespace Knobs {
 
 		public:
 
-			Hold( callback_t callback, knob_time_t time );
-			Hold( minimal_callback_t callback, knob_time_t time );
+			Hold( Callable *callable, knob_time_t time );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -286,8 +310,8 @@ namespace Knobs {
 			const knob_value_t _val;
 
 		public:
-			Over( callback_t callback, knob_value_t val );
-			Over( minimal_callback_t callback, knob_value_t val );
+
+			Over( Callable *callable, knob_value_t val );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -301,8 +325,8 @@ namespace Knobs {
 			const knob_value_t _val;
 
 		public:
-			Under( callback_t callback, knob_value_t val );
-			Under( minimal_callback_t callback, knob_value_t val );
+
+			Under( Callable *callable, knob_value_t val );
 
 			virtual bool handle( Device &dev,
 					knob_value_t newState, knob_value_t oldState, knob_time_t time );
@@ -317,9 +341,8 @@ namespace Knobs {
 			const knob_value_t _lower_bound;
 
 		public:
-			Hysteresis( callback_t callback,
-					knob_value_t lower_bound, knob_value_t upper_bound );
-			Hysteresis( minimal_callback_t callback,
+
+			Hysteresis( Callable *callable,
 					knob_value_t lower_bound, knob_value_t upper_bound );
 
 			virtual bool handle( Device &dev,
@@ -340,7 +363,8 @@ namespace Knobs {
 			float _value;
 
 		public:
-			SlowAveragingHysteresis( callback_t callback,
+
+			SlowAveragingHysteresis( Callable *callable,
 					float lower_bound, float upper_bound, int averaging );
 
 			virtual bool handle( Device &dev,
@@ -385,6 +409,7 @@ namespace Knobs {
 			virtual void loop() = 0;
 
 			// add a handler
+			Device& on( Handler *handler );
 			Device& on( Handler &handler );
 
 			// return name
@@ -392,29 +417,41 @@ namespace Knobs {
 
 			#define ON( WHAT ) \
 					inline Device& on ## WHAT( minimal_callback_t cb ) { \
-						on( *( new WHAT( cb ) ) ); \
+						on( new WHAT( new MinimalFunctionCallback( cb ) ) ); \
 						return *this; \
 					} \
 					inline Device& on ## WHAT( callback_t cb ) { \
-						on( *( new WHAT( cb ) ) ); \
+						on( new WHAT( new FunctionCallback( cb ) ) ); \
+						return *this; \
+					} \
+					inline Device& on ## WHAT( Callable &cb ) { \
+						on( new WHAT( &cb ) ); \
 						return *this; \
 					}
 			#define ONP( WHAT, TYPE ) \
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE val ) { \
-						on( *( new WHAT( cb, val ) ) ); \
+						on( new WHAT( new MinimalFunctionCallback( cb ), val ) ); \
 						return *this; \
 					} \
 					inline Device& on ## WHAT( callback_t cb, TYPE val ) { \
-						on( *( new WHAT( cb, val ) ) ); \
+						on( new WHAT( new FunctionCallback( cb ), val ) ); \
+						return *this; \
+					} \
+					inline Device& on ## WHAT( Callable &cb, TYPE val ) { \
+						on( new WHAT( &cb, val ) ); \
 						return *this; \
 					}
 			#define ONPP( WHAT, TYPE1, TYPE2 ) \
 					inline Device& on ## WHAT( minimal_callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
-						on( *( new WHAT( cb, val1, val2 ) ) ); \
+						on( new WHAT( new MinimalFunctionCallback( cb ), val1, val2 ) ); \
 						return *this; \
 					} \
 					inline Device& on ## WHAT( callback_t cb, TYPE1 val1, TYPE2 val2 ) { \
-						on( *( new WHAT( cb, val1, val2 ) ) ); \
+						on( new WHAT( new FunctionCallback( cb ), val1, val2 ) ); \
+						return *this; \
+					} \
+					inline Device& on ## WHAT( Callable &cb, TYPE1 val1, TYPE2 val2 ) { \
+						on( new WHAT( &cb, val1, val2 ) ); \
 						return *this; \
 					}
 
