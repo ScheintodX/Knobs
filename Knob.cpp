@@ -15,10 +15,9 @@ static inline knob_time_t MAX( knob_time_t v1, knob_time_t v2 ) {
 	return v1 > v2 ? v1 : v2;
 }
 
+
 /*****************************************************************************
-*
 *   D e v i c e
-*
 *****************************************************************************/
 
 Device::Device( const char *name ) : _name( name ) {
@@ -28,24 +27,28 @@ Device::Device( const char *name ) : _name( name ) {
 }
 
 Device& Device::enslave( Device &slave ){
-	slave.mute( true );
+
+	//slave.mute( true ); // Was wäre wohl hier der Sinn gewesen?
 	_slave = &slave;
 	return *this;
 }
+
 Device& Device::mute( bool mute ) {
+
 	_mute = mute;
 	return *this;
 }
+
 bool Device::mute() {
+
 	return _mute;
 }
 
 Device& Device::on( Handler *handler ){
 
 	return on( *handler );
-
-	return *this;
 }
+
 Device& Device::on( Handler &handler ){
 
 	_handlers.add( handler ) ;
@@ -53,8 +56,8 @@ Device& Device::on( Handler &handler ){
 	return *this;
 }
 
-
 const char* Device::name() {
+
 	return _name;
 }
 
@@ -76,9 +79,7 @@ void Device::_activate( knob_value_t newState, knob_value_t oldState, knob_time_
 
 
 /*****************************************************************************
-*
 *   B O O L E A N  D E V I C E
-*
 *****************************************************************************/
 
 BooleanDevice::BooleanDevice( const char *name, pin_t pin ) : Device( name ), _pin( pin ) {
@@ -92,12 +93,14 @@ BooleanDevice& BooleanDevice::pullup( bool on ) {
 
 	return *this;
 }
+
 BooleanDevice& BooleanDevice::invert( bool on ) {
 
 	_invert = on;
 
 	return *this;
 }
+
 bool BooleanDevice::_read() {
 
 	bool val = digitalRead( _pin );
@@ -112,9 +115,7 @@ pin_t BooleanDevice::pin() {
 
 
 /*****************************************************************************
-*
 *   K N O B
-*
 *****************************************************************************/
 
 Knob::Knob( const char *name, pin_t pin )
@@ -156,7 +157,6 @@ void Knob::loop() {
 	if( value ) {
 
 		_countDebounce = MIN( _timeDebounce, _countDebounce + delta );
-
 	} else {
 		_countDebounce = _countDebounce > delta ? _countDebounce-delta : 0;
 	}
@@ -181,9 +181,7 @@ Knob& Knob::debounce( knob_time_t time ) {
 
 
 /*****************************************************************************
-*
 *   H A N D L E R
-*
 *****************************************************************************/
 
 Handler::Handler( HandlerType type, Callable *callable )
@@ -203,6 +201,7 @@ bool Always::handle( Device &dev, knob_value_t newState, knob_value_t oldState, 
 
 	return _callback( dev, newState, oldState, time );
 }
+
 
 // == Push ==
 
@@ -242,9 +241,9 @@ bool Toggle::handle( Device &dev, knob_value_t newState, knob_value_t oldState, 
 	return true;
 }
 
-// == Transport ==
-// (callback regularily if active, deactove one time)
 
+// == Transport ==
+// (called regularily if active, then once when deactivated)
 Transport::Transport( Callable *callback, knob_time_t periode )
 		: Handler( HT_TRANSPORT, callback ), _periode( periode ){
 	
@@ -253,17 +252,24 @@ Transport::Transport( Callable *callback, knob_time_t periode )
 
 bool Transport::handle( Device &dev, knob_value_t newState, knob_value_t oldState, knob_time_t time ) {
 
+	bool call = false;
+
 	if( !oldState && newState ) {
+
 		_lastTime = time;
-		return _callback( dev, newState, oldState, time );
+		call = true;
+
+	} else if( newState && time - _lastTime > _periode ) {
+
+		_lastTime = time;
+		call = true;
+
+	} else if( oldState && !newState ) {
+
+		call = true;
 	}
 
-	if( newState && time - _lastTime > _periode ) {
-		_lastTime = time;
-		return _callback( dev, newState, oldState, time );
-	}
-
-	if( oldState && !newState ) {
+	if( call ){
 		return _callback( dev, newState, oldState, time );
 	}
 
@@ -309,6 +315,7 @@ bool Click::handle( Device &dev, knob_value_t newState, knob_value_t oldState, k
 
 	return true;
 }
+
 
 // == DoubleClick ==
 
@@ -396,6 +403,7 @@ bool MultiClick::handle( Device &dev, knob_value_t newState, knob_value_t oldSta
 
 }
 
+
 // == Hold ==
 
 Hold::Hold( Callable *callback, knob_time_t time )
@@ -433,7 +441,6 @@ Hold& Hold::continues( bool on ) {
 }
 
 
-
 // === Over ====
 
 Over::Over( Callable *callback, knob_value_t val )
@@ -469,6 +476,7 @@ bool Under::handle( Device &dev,
 
 }
 
+
 // === Hyseresis ====
 
 Hysteresis::Hysteresis( Callable *callback,
@@ -488,7 +496,6 @@ bool Hysteresis::handle( Device &dev,
 
 	return false;
 }
-
 
 
 // === SlowAveragingHysteresis ===
@@ -525,9 +532,11 @@ bool SlowAveragingHysteresis::handle( Device &dev,
 
 	return false;
 }
-/*
- * ## P A N E L ##
- */
+
+
+/*****************************************************************************
+*   P A N E L
+*****************************************************************************/
 
 Panel::Panel( const char *name )
 		: _name( name ){}

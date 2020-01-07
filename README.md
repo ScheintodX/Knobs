@@ -1,4 +1,8 @@
-# Knobs
+Knobs
+=====
+
+Overview
+--------
 
 Library for easy plug&play use of buttons and switches (and more to come)
 
@@ -17,6 +21,7 @@ event on each input pin. So you can e.g. check for click and hold at the same
 time.
 
 EXAMPLE:
+```
 
 	bool onClick( ... ){
 		Serial.println( "CLICK" );
@@ -29,17 +34,30 @@ EXAMPLE:
 	}
 
     Knob knob( D1 );
+	Transducer transducer;
 
 	void setup() {
-		knob
-			.invert( true )
-			.onClick( onClick )
-			.onHold( onHold )
-			;
+
+		transducer
+			<< knob
+				.invert( true )
+				.onClick( onClick )
+				.onHold( onHold )
+				;
+
 	}
 
 	void loop() {
 
 		knob.loop();
 	}
+```
+
+Classes
+-------
+
+|   |   |   |
+|---|---|---|
+|---|---|---|
+|   |   |   |
 
